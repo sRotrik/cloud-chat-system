@@ -1,0 +1,19 @@
+# Dependencies
+node_modules/
+server/node_modules/
+client/node_modules/
+
+# Environment variables (NEVER commit these)
+.env
+server/.env
+
+# Logs
+*.log
+npm-debug.log*
+
+# Docker
+.dockerignore
+
+# OS files
+.DS_Store
+Thumbs.db
