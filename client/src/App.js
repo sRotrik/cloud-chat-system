@@ -43,7 +43,7 @@ function App() {
 
       return () => socket.disconnect();
     }
-  }, [joined]);
+  }, [joined, room]);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
