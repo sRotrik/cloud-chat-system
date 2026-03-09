@@ -1,0 +1,38 @@
+name: Deploy Cloud Chat System
+
+on:
+  push:
+    branches: [ main ]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '18'
+
+      - name: Install server dependencies
+        run: cd server && npm install
+
+      - name: Verify server files
+        run: |
+          echo "✅ Server files present:"
+          ls server/
+
+  docker:
+    runs-on: ubuntu-latest
+    needs: test
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Build Docker image
+        run: docker build -t cloud-chat-server ./server
+
+      - name: Verify Docker image
+        run: docker images | grep cloud-chat-server
