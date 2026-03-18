@@ -21,13 +21,24 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
+// Auth routes
+const authRoutes = require('./routes/auth');
+app.use('/auth', authRoutes);
+
 const server = http.createServer(app);
 const io = new Server(server, {
   cors: { origin: "*", methods: ["GET", "POST"] }
 });
 
 // Redis Pub/Sub setup
-const pubClient = createClient({ url: REDIS_URL });
+const pubClient = createClient({ 
+  url: REDIS_URL,
+  socket: {
+    tls: true,
+    rejectUnauthorized: false,
+    connectTimeout: 30000,
+  }
+});
 const subClient = pubClient.duplicate();
 
 Promise.all([pubClient.connect(), subClient.connect()])
