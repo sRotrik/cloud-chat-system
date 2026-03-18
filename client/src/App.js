@@ -4,7 +4,7 @@ import io from 'socket.io-client';
 const SERVER = process.env.REACT_APP_SERVER_URL || 'http://localhost:3001';
 
 function App() {
-  const [screen, setScreen] = useState('login'); // login, register, chat
+  const [screen, setScreen] = useState('login');
   const [username, setUsername] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -20,7 +20,6 @@ function App() {
   const socketRef = useRef(null);
   const bottomRef = useRef(null);
 
-  // Check token on load
   useEffect(() => {
     const savedToken = localStorage.getItem('token');
     const savedUsername = localStorage.getItem('username');
@@ -29,8 +28,6 @@ function App() {
       setUsername(savedUsername);
       setScreen('room');
     }
-
-    // Handle Google OAuth redirect
     const params = new URLSearchParams(window.location.search);
     const googleToken = params.get('token');
     const googleUsername = params.get('username');
@@ -103,20 +100,17 @@ function App() {
     localStorage.removeItem('username');
     setToken('');
     setUsername('');
-    setJoined(false);
     setMessages([]);
     setScreen('login');
     if (socketRef.current) socketRef.current.disconnect();
   };
 
   const joinRoom = () => {
-    setJoined(true);
     const socket = io(SERVER, {
       auth: { token },
       reconnection: true,
     });
     socketRef.current = socket;
-
     socket.on('connect', () => setConnected(true));
     socket.on('disconnect', () => setConnected(false));
     socket.emit('join_room', room);
@@ -127,6 +121,7 @@ function App() {
       setTimeout(() => setTyping(''), 2000);
     });
     socket.on('online_count', (count) => setOnlineUsers(count));
+    setScreen('chat');
   };
 
   const sendMessage = () => {
@@ -143,12 +138,10 @@ function App() {
 
   const leaveRoom = () => {
     if (socketRef.current) socketRef.current.disconnect();
-    setJoined(false);
     setMessages([]);
     setScreen('room');
   };
 
-  // LOGIN SCREEN
   if (screen === 'login') {
     return (
       <div style={styles.authContainer}>
@@ -158,9 +151,7 @@ function App() {
             <h1 style={styles.logo}>CloudChat</h1>
           </div>
           <p style={styles.subtitle}>Sign in to continue</p>
-
           {error && <div style={styles.errorBox}>{error}</div>}
-
           <div style={styles.inputGroup}>
             <label style={styles.label}>Email</label>
             <input style={styles.input} type="email" placeholder="your@email.com"
@@ -173,17 +164,13 @@ function App() {
               value={password} onChange={e => setPassword(e.target.value)}
               onKeyDown={e => e.key === 'Enter' && handleLogin()} />
           </div>
-
           <button style={styles.primaryBtn} onClick={handleLogin} disabled={loading}>
             {loading ? 'Signing in...' : 'Sign In →'}
           </button>
-
           <div style={styles.divider}><span>or</span></div>
-
           <button style={styles.googleBtn} onClick={handleGoogleLogin}>
             <span style={styles.googleIcon}>G</span> Continue with Google
           </button>
-
           <p style={styles.switchText}>
             Don't have an account?{' '}
             <span style={styles.switchLink} onClick={() => { setScreen('register'); setError(''); }}>
@@ -195,7 +182,6 @@ function App() {
     );
   }
 
-  // REGISTER SCREEN
   if (screen === 'register') {
     return (
       <div style={styles.authContainer}>
@@ -205,9 +191,7 @@ function App() {
             <h1 style={styles.logo}>CloudChat</h1>
           </div>
           <p style={styles.subtitle}>Create your account</p>
-
           {error && <div style={styles.errorBox}>{error}</div>}
-
           <div style={styles.inputGroup}>
             <label style={styles.label}>Username</label>
             <input style={styles.input} placeholder="cooluser123"
@@ -223,17 +207,13 @@ function App() {
             <input style={styles.input} type="password" placeholder="••••••••"
               value={password} onChange={e => setPassword(e.target.value)} />
           </div>
-
           <button style={styles.primaryBtn} onClick={handleRegister} disabled={loading}>
             {loading ? 'Creating account...' : 'Create Account →'}
           </button>
-
           <div style={styles.divider}><span>or</span></div>
-
           <button style={styles.googleBtn} onClick={handleGoogleLogin}>
             <span style={styles.googleIcon}>G</span> Continue with Google
           </button>
-
           <p style={styles.switchText}>
             Already have an account?{' '}
             <span style={styles.switchLink} onClick={() => { setScreen('login'); setError(''); }}>
@@ -245,7 +225,6 @@ function App() {
     );
   }
 
-  // ROOM SELECT SCREEN
   if (screen === 'room') {
     return (
       <div style={styles.authContainer}>
@@ -255,7 +234,6 @@ function App() {
             <h1 style={styles.logo}>CloudChat</h1>
           </div>
           <p style={styles.subtitle}>Welcome back, <strong style={{color:'#f5a623'}}>{username}</strong>!</p>
-
           <div style={styles.inputGroup}>
             <label style={styles.label}>Select Room</label>
             <select style={styles.select} value={room} onChange={e => setRoom(e.target.value)}>
@@ -265,11 +243,9 @@ function App() {
               <option value="random">🎲 Random</option>
             </select>
           </div>
-
           <button style={styles.primaryBtn} onClick={joinRoom}>
             Join #{room} →
           </button>
-
           <button style={styles.logoutBtn} onClick={handleLogout}>
             Sign Out
           </button>
@@ -278,7 +254,6 @@ function App() {
     );
   }
 
-  // CHAT SCREEN
   return (
     <div style={styles.chatContainer}>
       <div style={styles.header}>
@@ -299,7 +274,6 @@ function App() {
           <button style={styles.logoutBtn2} onClick={handleLogout}>Logout</button>
         </div>
       </div>
-
       <div style={styles.infoBar}>
         <span>⚡ WebSocket</span>
         <span>🔴 Redis Pub/Sub</span>
@@ -308,7 +282,6 @@ function App() {
         <span>🔐 JWT Auth</span>
         <span style={styles.onlineCount}>🟢 {onlineUsers} online</span>
       </div>
-
       <div style={styles.messagesContainer}>
         {messages.length === 0 && (
           <div style={styles.emptyState}>
@@ -336,13 +309,11 @@ function App() {
         ))}
         <div ref={bottomRef} />
       </div>
-
       {typing && (
         <div style={styles.typingIndicator}>
           <span style={styles.typingDots}>•••</span> {typing}
         </div>
       )}
-
       <div style={styles.inputContainer}>
         <input style={styles.messageInput}
           placeholder={`Message #${room}...`}
@@ -411,7 +382,6 @@ const styles = {
   divider: {
     display: 'flex', alignItems: 'center', gap: '12px',
     color: 'rgba(255,255,255,0.3)', fontSize: '13px',
-    '::before': { content: '""', flex: 1, height: '1px', background: 'rgba(255,255,255,0.1)' },
   },
   switchText: { color: 'rgba(255,255,255,0.4)', textAlign: 'center', fontSize: '13px', margin: 0 },
   switchLink: { color: '#f5a623', cursor: 'pointer', fontWeight: '600' },
