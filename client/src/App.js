@@ -12,7 +12,6 @@ function App() {
   const [room, setRoom] = useState('general');
   const [message, setMessage] = useState('');
   const [messages, setMessages] = useState([]);
-  const [joined, setJoined] = useState(false);
   const [typing, setTyping] = useState('');
   const [onlineUsers, setOnlineUsers] = useState(0);
   const [connected, setConnected] = useState(false);
