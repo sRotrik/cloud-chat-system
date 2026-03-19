@@ -23,9 +23,11 @@ function App() {
   const [privateMessage, setPrivateMessage] = useState('');
   const [usersList, setUsersList] = useState([]);
   const [notification, setNotification] = useState('');
+  const [uploading, setUploading] = useState(false);
   const socketRef = useRef(null);
   const bottomRef = useRef(null);
   const privateBottomRef = useRef(null);
+  const fileInputRef = useRef(null);
 
   useEffect(() => {
     const savedToken = localStorage.getItem('token');
@@ -181,9 +183,84 @@ function App() {
     if (socketRef.current) socketRef.current.emit('private_typing', { from: username, to: privateUser });
   };
 
+  const handleFileUpload = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    if (file.size > 10 * 1024 * 1024) {
+      alert('File size must be under 10MB');
+      return;
+    }
+
+    setUploading(true);
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+      formData.append('username', username);
+      formData.append('room', room);
+
+      const res = await fetch(`${SERVER}/media/upload`, {
+        method: 'POST',
+        body: formData,
+      });
+      const data = await res.json();
+      if (data.error) { alert(data.error); return; }
+
+      // Send file message
+      if (socketRef.current) {
+        socketRef.current.emit('send_message', {
+          room,
+          username,
+          message: `📎 ${data.originalName}`,
+          fileId: data.fileId,
+          fileUrl: `${SERVER}/media/file/${data.fileId}`,
+          mimetype: data.mimetype,
+          originalName: data.originalName,
+        });
+      }
+    } catch (err) {
+      alert('Upload failed: ' + err.message);
+    } finally {
+      setUploading(false);
+      e.target.value = '';
+    }
+  };
+
   const leaveRoom = () => {
     if (socketRef.current) socketRef.current.disconnect();
     setMessages([]); setScreen('room');
+  };
+
+  const renderMedia = (msg) => {
+    if (!msg.fileUrl) return null;
+    const mime = msg.mimetype || '';
+
+    if (mime.startsWith('image/')) {
+      return (
+        <img src={msg.fileUrl} alt={msg.originalName}
+          style={styles.mediaImage}
+          onClick={() => window.open(msg.fileUrl, '_blank')} />
+      );
+    }
+    if (mime.startsWith('video/')) {
+      return (
+        <video controls style={styles.mediaVideo}>
+          <source src={msg.fileUrl} type={mime} />
+        </video>
+      );
+    }
+    if (mime.startsWith('audio/')) {
+      return (
+        <audio controls style={styles.mediaAudio}>
+          <source src={msg.fileUrl} type={mime} />
+        </audio>
+      );
+    }
+    return (
+      <a href={msg.fileUrl} target="_blank" rel="noreferrer" style={styles.fileLink}>
+        📎 {msg.originalName}
+      </a>
+    );
   };
 
   if (screen === 'login') return (
@@ -415,6 +492,7 @@ function App() {
         <span>🐳 Docker</span>
         <span>🔐 JWT Auth</span>
         <span>🔒 E2E Encrypt</span>
+        <span>📎 Media</span>
         <span style={styles.onlineCount}>🟢 {onlineUsers} online</span>
       </div>
       <div style={styles.messagesContainer}>
@@ -439,7 +517,7 @@ function App() {
                 </div>
               )}
               <div style={m.username === username ? styles.myBubble : styles.otherBubble}>
-                {m.message}
+                {m.fileUrl ? renderMedia(m) : m.message}
               </div>
               <div style={styles.msgTime}>
                 {new Date(m.timestamp).toLocaleTimeString()}
@@ -457,6 +535,21 @@ function App() {
         </div>
       )}
       <div style={styles.inputContainer}>
+        <input
+          type="file"
+          ref={fileInputRef}
+          onChange={handleFileUpload}
+          accept="image/*,video/*,audio/*"
+          style={{ display: 'none' }}
+        />
+        <button
+          style={styles.attachBtn}
+          onClick={() => fileInputRef.current.click()}
+          disabled={uploading}
+          title="Attach image, video or audio (max 10MB)"
+        >
+          {uploading ? '⏳' : '📎'}
+        </button>
         <input style={styles.messageInput}
           placeholder={`Message #${room}...`}
           value={message} onChange={handleTyping}
@@ -579,6 +672,7 @@ const styles = {
   infoBar: {
     background: 'rgba(255,255,255,0.03)', borderBottom: '1px solid rgba(255,255,255,0.06)',
     padding: '8px 24px', display: 'flex', gap: '24px', fontSize: '12px', color: 'rgba(255,255,255,0.4)',
+    overflowX: 'auto',
   },
   onlineCount: { marginLeft: 'auto', color: '#51cf66' },
   messagesContainer: { flex: 1, overflowY: 'auto', padding: '24px', display: 'flex', flexDirection: 'column', gap: '16px' },
@@ -620,11 +714,19 @@ const styles = {
   inputContainer: {
     display: 'flex', gap: '12px', padding: '16px 24px 24px',
     borderTop: '1px solid rgba(255,255,255,0.08)', background: 'rgba(255,255,255,0.02)',
+    alignItems: 'center',
   },
   messageInput: {
     flex: 1, padding: '14px 20px', borderRadius: '25px',
     border: '1px solid rgba(255,255,255,0.15)', background: 'rgba(255,255,255,0.08)',
     color: '#fff', fontSize: '14px', outline: 'none',
+  },
+  attachBtn: {
+    width: '48px', height: '48px', background: 'rgba(255,255,255,0.1)',
+    border: '1px solid rgba(255,255,255,0.2)', borderRadius: '50%',
+    color: '#fff', fontSize: '20px', cursor: 'pointer',
+    display: 'flex', alignItems: 'center', justifyContent: 'center',
+    flexShrink: 0,
   },
   sendBtn: {
     width: '48px', height: '48px', background: 'linear-gradient(135deg, #f5a623, #f0532a)',
@@ -654,6 +756,19 @@ const styles = {
     background: 'rgba(81,207,102,0.2)', border: '1px solid rgba(81,207,102,0.3)',
     borderRadius: '8px', padding: '8px 16px', color: '#51cf66',
     fontSize: '13px', cursor: 'pointer',
+  },
+  mediaImage: {
+    maxWidth: '100%', maxHeight: '300px', borderRadius: '12px',
+    cursor: 'pointer', display: 'block',
+  },
+  mediaVideo: {
+    maxWidth: '100%', maxHeight: '300px', borderRadius: '12px', display: 'block',
+  },
+  mediaAudio: {
+    width: '100%', borderRadius: '12px',
+  },
+  fileLink: {
+    color: '#f5a623', textDecoration: 'none', fontWeight: '600',
   },
 };
 

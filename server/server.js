@@ -26,6 +26,7 @@ const authRoutes = require('./routes/auth');
 const { router: privateRoutes, getSharedKey, getRoomId } = require('./routes/private');
 app.use('/auth', authRoutes);
 app.use('/private', privateRoutes);
+app.use('/media', mediaRoutes);
 
 const server = http.createServer(app);
 const io = new Server(server, {
