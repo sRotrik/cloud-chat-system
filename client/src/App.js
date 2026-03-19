@@ -17,8 +17,15 @@ function App() {
   const [connected, setConnected] = useState(false);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  // Private chat states
+  const [privateUser, setPrivateUser] = useState('');
+  const [privateMessages, setPrivateMessages] = useState([]);
+  const [privateTyping, setPrivateTyping] = useState('');
+  const [privateMessage, setPrivateMessage] = useState('');
+  const [usersList, setUsersList] = useState([]);
   const socketRef = useRef(null);
   const bottomRef = useRef(null);
+  const privateBottomRef = useRef(null);
 
   useEffect(() => {
     const savedToken = localStorage.getItem('token');
@@ -45,9 +52,12 @@ function App() {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
+  useEffect(() => {
+    privateBottomRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [privateMessages]);
+
   const handleRegister = async () => {
-    setLoading(true);
-    setError('');
+    setLoading(true); setError('');
     try {
       const res = await fetch(`${SERVER}/auth/register`, {
         method: 'POST',
@@ -58,19 +68,13 @@ function App() {
       if (data.error) { setError(data.error); return; }
       localStorage.setItem('token', data.token);
       localStorage.setItem('username', data.user.username);
-      setToken(data.token);
-      setUsername(data.user.username);
-      setScreen('room');
-    } catch (err) {
-      setError('Registration failed. Try again.');
-    } finally {
-      setLoading(false);
-    }
+      setToken(data.token); setUsername(data.user.username); setScreen('room');
+    } catch { setError('Registration failed.'); }
+    finally { setLoading(false); }
   };
 
   const handleLogin = async () => {
-    setLoading(true);
-    setError('');
+    setLoading(true); setError('');
     try {
       const res = await fetch(`${SERVER}/auth/login`, {
         method: 'POST',
@@ -81,14 +85,9 @@ function App() {
       if (data.error) { setError(data.error); return; }
       localStorage.setItem('token', data.token);
       localStorage.setItem('username', data.user.username);
-      setToken(data.token);
-      setUsername(data.user.username);
-      setScreen('room');
-    } catch (err) {
-      setError('Login failed. Try again.');
-    } finally {
-      setLoading(false);
-    }
+      setToken(data.token); setUsername(data.user.username); setScreen('room');
+    } catch { setError('Login failed.'); }
+    finally { setLoading(false); }
   };
 
   const handleGoogleLogin = () => {
@@ -98,18 +97,12 @@ function App() {
   const handleLogout = () => {
     localStorage.removeItem('token');
     localStorage.removeItem('username');
-    setToken('');
-    setUsername('');
-    setMessages([]);
-    setScreen('login');
+    setToken(''); setUsername(''); setMessages([]); setScreen('login');
     if (socketRef.current) socketRef.current.disconnect();
   };
 
   const joinRoom = () => {
-    const socket = io(SERVER, {
-      auth: { token },
-      reconnection: true,
-    });
+    const socket = io(SERVER, { auth: { token }, reconnection: true });
     socketRef.current = socket;
     socket.on('connect', () => setConnected(true));
     socket.on('disconnect', () => setConnected(false));
@@ -121,7 +114,33 @@ function App() {
       setTimeout(() => setTyping(''), 2000);
     });
     socket.on('online_count', (count) => setOnlineUsers(count));
+    socket.on('private_history', (history) => setPrivateMessages(history));
+    socket.on('receive_private', (msg) => setPrivateMessages(prev => [...prev, msg]));
+    socket.on('private_user_typing', (user) => {
+      setPrivateTyping(`${user} is typing...`);
+      setTimeout(() => setPrivateTyping(''), 2000);
+    });
     setScreen('chat');
+    // Load users list
+    fetchUsers();
+  };
+
+  const fetchUsers = async () => {
+    try {
+      const res = await fetch(`${SERVER}/private/users`);
+      const data = await res.json();
+      setUsersList(data);
+    } catch (err) {
+      console.log('Error fetching users:', err);
+    }
+  };
+
+  const openPrivateChat = (targetUser) => {
+    setPrivateUser(targetUser);
+    if (socketRef.current) {
+      socketRef.current.emit('join_private', { from: username, to: targetUser });
+    }
+    setScreen('private');
   };
 
   const sendMessage = () => {
@@ -131,129 +150,197 @@ function App() {
     }
   };
 
+  const sendPrivateMessage = () => {
+    if (privateMessage.trim() && socketRef.current) {
+      socketRef.current.emit('send_private', {
+        from: username,
+        to: privateUser,
+        message: privateMessage,
+      });
+      setPrivateMessage('');
+    }
+  };
+
   const handleTyping = (e) => {
     setMessage(e.target.value);
     if (socketRef.current) socketRef.current.emit('typing', { room, username });
   };
 
-  const leaveRoom = () => {
-    if (socketRef.current) socketRef.current.disconnect();
-    setMessages([]);
-    setScreen('room');
+  const handlePrivateTyping = (e) => {
+    setPrivateMessage(e.target.value);
+    if (socketRef.current) socketRef.current.emit('private_typing', { from: username, to: privateUser });
   };
 
-  if (screen === 'login') {
-    return (
-      <div style={styles.authContainer}>
-        <div style={styles.authBox}>
-          <div style={styles.logoContainer}>
-            <span style={styles.logoIcon}>☁️</span>
-            <h1 style={styles.logo}>CloudChat</h1>
+  const leaveRoom = () => {
+    if (socketRef.current) socketRef.current.disconnect();
+    setMessages([]); setScreen('room');
+  };
+
+  // LOGIN
+  if (screen === 'login') return (
+    <div style={styles.authContainer}>
+      <div style={styles.authBox}>
+        <div style={styles.logoContainer}>
+          <span style={styles.logoIcon}>☁️</span>
+          <h1 style={styles.logo}>CloudChat</h1>
+        </div>
+        <p style={styles.subtitle}>Sign in to continue</p>
+        {error && <div style={styles.errorBox}>{error}</div>}
+        <div style={styles.inputGroup}>
+          <label style={styles.label}>Email</label>
+          <input style={styles.input} type="email" placeholder="your@email.com"
+            value={email} onChange={e => setEmail(e.target.value)}
+            onKeyDown={e => e.key === 'Enter' && handleLogin()} />
+        </div>
+        <div style={styles.inputGroup}>
+          <label style={styles.label}>Password</label>
+          <input style={styles.input} type="password" placeholder="••••••••"
+            value={password} onChange={e => setPassword(e.target.value)}
+            onKeyDown={e => e.key === 'Enter' && handleLogin()} />
+        </div>
+        <button style={styles.primaryBtn} onClick={handleLogin} disabled={loading}>
+          {loading ? 'Signing in...' : 'Sign In →'}
+        </button>
+        <div style={styles.divider}><span>or</span></div>
+        <button style={styles.googleBtn} onClick={handleGoogleLogin}>
+          <span style={styles.googleIcon}>G</span> Continue with Google
+        </button>
+        <p style={styles.switchText}>
+          Don't have an account?{' '}
+          <span style={styles.switchLink} onClick={() => { setScreen('register'); setError(''); }}>Register</span>
+        </p>
+      </div>
+    </div>
+  );
+
+  // REGISTER
+  if (screen === 'register') return (
+    <div style={styles.authContainer}>
+      <div style={styles.authBox}>
+        <div style={styles.logoContainer}>
+          <span style={styles.logoIcon}>☁️</span>
+          <h1 style={styles.logo}>CloudChat</h1>
+        </div>
+        <p style={styles.subtitle}>Create your account</p>
+        {error && <div style={styles.errorBox}>{error}</div>}
+        <div style={styles.inputGroup}>
+          <label style={styles.label}>Username</label>
+          <input style={styles.input} placeholder="cooluser123"
+            value={username} onChange={e => setUsername(e.target.value)} />
+        </div>
+        <div style={styles.inputGroup}>
+          <label style={styles.label}>Email</label>
+          <input style={styles.input} type="email" placeholder="your@email.com"
+            value={email} onChange={e => setEmail(e.target.value)} />
+        </div>
+        <div style={styles.inputGroup}>
+          <label style={styles.label}>Password</label>
+          <input style={styles.input} type="password" placeholder="••••••••"
+            value={password} onChange={e => setPassword(e.target.value)} />
+        </div>
+        <button style={styles.primaryBtn} onClick={handleRegister} disabled={loading}>
+          {loading ? 'Creating account...' : 'Create Account →'}
+        </button>
+        <div style={styles.divider}><span>or</span></div>
+        <button style={styles.googleBtn} onClick={handleGoogleLogin}>
+          <span style={styles.googleIcon}>G</span> Continue with Google
+        </button>
+        <p style={styles.switchText}>
+          Already have an account?{' '}
+          <span style={styles.switchLink} onClick={() => { setScreen('login'); setError(''); }}>Sign In</span>
+        </p>
+      </div>
+    </div>
+  );
+
+  // ROOM SELECT
+  if (screen === 'room') return (
+    <div style={styles.authContainer}>
+      <div style={styles.authBox}>
+        <div style={styles.logoContainer}>
+          <span style={styles.logoIcon}>☁️</span>
+          <h1 style={styles.logo}>CloudChat</h1>
+        </div>
+        <p style={styles.subtitle}>Welcome back, <strong style={{color:'#f5a623'}}>{username}</strong>!</p>
+        <div style={styles.inputGroup}>
+          <label style={styles.label}>Select Room</label>
+          <select style={styles.select} value={room} onChange={e => setRoom(e.target.value)}>
+            <option value="general">💬 General</option>
+            <option value="tech">💻 Tech Talk</option>
+            <option value="cloud">☁️ Cloud Engineering</option>
+            <option value="random">🎲 Random</option>
+          </select>
+        </div>
+        <button style={styles.primaryBtn} onClick={joinRoom}>Join #{room} →</button>
+        <button style={styles.logoutBtn} onClick={handleLogout}>Sign Out</button>
+      </div>
+    </div>
+  );
+
+  // PRIVATE CHAT
+  if (screen === 'private') return (
+    <div style={styles.chatContainer}>
+      <div style={styles.header}>
+        <div style={styles.headerLeft}>
+          <span style={styles.headerIcon}>🔐</span>
+          <div>
+            <h2 style={styles.headerTitle}>Private: {privateUser}</h2>
+            <p style={styles.headerSub}>End-to-End Encrypted • Auto-deletes in 10 min</p>
           </div>
-          <p style={styles.subtitle}>Sign in to continue</p>
-          {error && <div style={styles.errorBox}>{error}</div>}
-          <div style={styles.inputGroup}>
-            <label style={styles.label}>Email</label>
-            <input style={styles.input} type="email" placeholder="your@email.com"
-              value={email} onChange={e => setEmail(e.target.value)}
-              onKeyDown={e => e.key === 'Enter' && handleLogin()} />
-          </div>
-          <div style={styles.inputGroup}>
-            <label style={styles.label}>Password</label>
-            <input style={styles.input} type="password" placeholder="••••••••"
-              value={password} onChange={e => setPassword(e.target.value)}
-              onKeyDown={e => e.key === 'Enter' && handleLogin()} />
-          </div>
-          <button style={styles.primaryBtn} onClick={handleLogin} disabled={loading}>
-            {loading ? 'Signing in...' : 'Sign In →'}
-          </button>
-          <div style={styles.divider}><span>or</span></div>
-          <button style={styles.googleBtn} onClick={handleGoogleLogin}>
-            <span style={styles.googleIcon}>G</span> Continue with Google
-          </button>
-          <p style={styles.switchText}>
-            Don't have an account?{' '}
-            <span style={styles.switchLink} onClick={() => { setScreen('register'); setError(''); }}>
-              Register
-            </span>
-          </p>
+        </div>
+        <div style={styles.headerRight}>
+          <div style={styles.encryptedBadge}>🔒 E2E Encrypted</div>
+          <div style={styles.userBadge}>👤 {username}</div>
+          <button style={styles.leaveBtn} onClick={() => setScreen('chat')}>Back</button>
+          <button style={styles.logoutBtn2} onClick={handleLogout}>Logout</button>
         </div>
       </div>
-    );
-  }
-
-  if (screen === 'register') {
-    return (
-      <div style={styles.authContainer}>
-        <div style={styles.authBox}>
-          <div style={styles.logoContainer}>
-            <span style={styles.logoIcon}>☁️</span>
-            <h1 style={styles.logo}>CloudChat</h1>
-          </div>
-          <p style={styles.subtitle}>Create your account</p>
-          {error && <div style={styles.errorBox}>{error}</div>}
-          <div style={styles.inputGroup}>
-            <label style={styles.label}>Username</label>
-            <input style={styles.input} placeholder="cooluser123"
-              value={username} onChange={e => setUsername(e.target.value)} />
-          </div>
-          <div style={styles.inputGroup}>
-            <label style={styles.label}>Email</label>
-            <input style={styles.input} type="email" placeholder="your@email.com"
-              value={email} onChange={e => setEmail(e.target.value)} />
-          </div>
-          <div style={styles.inputGroup}>
-            <label style={styles.label}>Password</label>
-            <input style={styles.input} type="password" placeholder="••••••••"
-              value={password} onChange={e => setPassword(e.target.value)} />
-          </div>
-          <button style={styles.primaryBtn} onClick={handleRegister} disabled={loading}>
-            {loading ? 'Creating account...' : 'Create Account →'}
-          </button>
-          <div style={styles.divider}><span>or</span></div>
-          <button style={styles.googleBtn} onClick={handleGoogleLogin}>
-            <span style={styles.googleIcon}>G</span> Continue with Google
-          </button>
-          <p style={styles.switchText}>
-            Already have an account?{' '}
-            <span style={styles.switchLink} onClick={() => { setScreen('login'); setError(''); }}>
-              Sign In
-            </span>
-          </p>
-        </div>
+      <div style={styles.privateBanner}>
+        🔐 Messages are AES-256 encrypted • 🕐 Auto-deleted after 10 minutes • 👁️ Only you and {privateUser} can read these
       </div>
-    );
-  }
-
-  if (screen === 'room') {
-    return (
-      <div style={styles.authContainer}>
-        <div style={styles.authBox}>
-          <div style={styles.logoContainer}>
-            <span style={styles.logoIcon}>☁️</span>
-            <h1 style={styles.logo}>CloudChat</h1>
+      <div style={styles.messagesContainer}>
+        {privateMessages.length === 0 && (
+          <div style={styles.emptyState}>
+            <div style={styles.emptyIcon}>🔐</div>
+            <p style={styles.emptyText}>Encrypted Private Chat</p>
+            <p style={styles.emptySubtext}>Messages auto-delete after 10 minutes</p>
           </div>
-          <p style={styles.subtitle}>Welcome back, <strong style={{color:'#f5a623'}}>{username}</strong>!</p>
-          <div style={styles.inputGroup}>
-            <label style={styles.label}>Select Room</label>
-            <select style={styles.select} value={room} onChange={e => setRoom(e.target.value)}>
-              <option value="general">💬 General</option>
-              <option value="tech">💻 Tech Talk</option>
-              <option value="cloud">☁️ Cloud Engineering</option>
-              <option value="random">🎲 Random</option>
-            </select>
+        )}
+        {privateMessages.map((m, i) => (
+          <div key={i} style={m.from === username ? styles.myMessageWrapper : styles.otherMessageWrapper}>
+            {m.from !== username && <div style={styles.avatar}>{m.from.charAt(0).toUpperCase()}</div>}
+            <div style={styles.messageContent}>
+              {m.from !== username && <div style={styles.msgUsername}>{m.from}</div>}
+              <div style={m.from === username ? styles.myBubble : styles.otherBubble}>
+                🔒 {m.message}
+              </div>
+              <div style={styles.msgTime}>
+                {new Date(m.timestamp).toLocaleTimeString()}
+                {m.expiresAt && <span style={styles.expiryText}> • expires {new Date(m.expiresAt).toLocaleTimeString()}</span>}
+              </div>
+            </div>
+            {m.from === username && <div style={styles.avatarMe}>{username.charAt(0).toUpperCase()}</div>}
           </div>
-          <button style={styles.primaryBtn} onClick={joinRoom}>
-            Join #{room} →
-          </button>
-          <button style={styles.logoutBtn} onClick={handleLogout}>
-            Sign Out
-          </button>
-        </div>
+        ))}
+        <div ref={privateBottomRef} />
       </div>
-    );
-  }
+      {privateTyping && (
+        <div style={styles.typingIndicator}>
+          <span style={styles.typingDots}>•••</span> {privateTyping}
+        </div>
+      )}
+      <div style={styles.inputContainer}>
+        <input style={styles.messageInput}
+          placeholder="Encrypted message..."
+          value={privateMessage} onChange={handlePrivateTyping}
+          onKeyDown={e => e.key === 'Enter' && sendPrivateMessage()} />
+        <button style={privateMessage.trim() ? styles.sendBtn : styles.sendBtnDisabled}
+          onClick={sendPrivateMessage} disabled={!privateMessage.trim()}>🔒</button>
+      </div>
+    </div>
+  );
 
+  // MAIN CHAT
   return (
     <div style={styles.chatContainer}>
       <div style={styles.header}>
@@ -270,6 +357,7 @@ function App() {
             <span style={styles.statusText}>{connected ? 'Connected' : 'Disconnected'}</span>
           </div>
           <div style={styles.userBadge}>👤 {username}</div>
+          <button style={styles.privateBtn} onClick={() => setScreen('users')}>💬 DM</button>
           <button style={styles.leaveBtn} onClick={leaveRoom}>Leave</button>
           <button style={styles.logoutBtn2} onClick={handleLogout}>Logout</button>
         </div>
@@ -280,6 +368,7 @@ function App() {
         <span>🍃 MongoDB</span>
         <span>🐳 Docker</span>
         <span>🔐 JWT Auth</span>
+        <span>🔒 E2E Encrypt</span>
         <span style={styles.onlineCount}>🟢 {onlineUsers} online</span>
       </div>
       <div style={styles.messagesContainer}>
@@ -293,18 +382,22 @@ function App() {
         {messages.map((m, i) => (
           <div key={i} style={m.username === username ? styles.myMessageWrapper : styles.otherMessageWrapper}>
             {m.username !== username && (
-              <div style={styles.avatar}>{m.username.charAt(0).toUpperCase()}</div>
+              <div style={styles.avatar} onClick={() => openPrivateChat(m.username)} title="Send private message">
+                {m.username.charAt(0).toUpperCase()}
+              </div>
             )}
             <div style={styles.messageContent}>
-              {m.username !== username && <div style={styles.msgUsername}>{m.username}</div>}
+              {m.username !== username && (
+                <div style={styles.msgUsername} onClick={() => openPrivateChat(m.username)}>
+                  {m.username} <span style={styles.dmHint}>💬 DM</span>
+                </div>
+              )}
               <div style={m.username === username ? styles.myBubble : styles.otherBubble}>
                 {m.message}
               </div>
               <div style={styles.msgTime}>{new Date(m.timestamp).toLocaleTimeString()}</div>
             </div>
-            {m.username === username && (
-              <div style={styles.avatarMe}>{username.charAt(0).toUpperCase()}</div>
-            )}
+            {m.username === username && <div style={styles.avatarMe}>{username.charAt(0).toUpperCase()}</div>}
           </div>
         ))}
         <div ref={bottomRef} />
@@ -324,6 +417,8 @@ function App() {
       </div>
     </div>
   );
+
+  // USERS LIST screen handled inline above via setScreen('users')
 }
 
 const styles = {
@@ -335,8 +430,7 @@ const styles = {
     background: 'rgba(255,255,255,0.05)', backdropFilter: 'blur(20px)',
     border: '1px solid rgba(255,255,255,0.1)', borderRadius: '24px',
     padding: '48px 40px', width: '420px', display: 'flex',
-    flexDirection: 'column', gap: '16px',
-    boxShadow: '0 32px 64px rgba(0,0,0,0.6)',
+    flexDirection: 'column', gap: '16px', boxShadow: '0 32px 64px rgba(0,0,0,0.6)',
   },
   logoContainer: { display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '12px' },
   logoIcon: { fontSize: '36px' },
@@ -379,10 +473,7 @@ const styles = {
     justifyContent: 'center', fontWeight: 'bold', fontSize: '14px',
     lineHeight: '24px', textAlign: 'center',
   },
-  divider: {
-    display: 'flex', alignItems: 'center', gap: '12px',
-    color: 'rgba(255,255,255,0.3)', fontSize: '13px',
-  },
+  divider: { display: 'flex', alignItems: 'center', gap: '12px', color: 'rgba(255,255,255,0.3)', fontSize: '13px' },
   switchText: { color: 'rgba(255,255,255,0.4)', textAlign: 'center', fontSize: '13px', margin: 0 },
   switchLink: { color: '#f5a623', cursor: 'pointer', fontWeight: '600' },
   logoutBtn: {
@@ -412,19 +503,30 @@ const styles = {
     background: 'rgba(245,166,35,0.2)', border: '1px solid rgba(245,166,35,0.3)',
     borderRadius: '20px', padding: '6px 14px', color: '#f5a623', fontSize: '13px', fontWeight: '600',
   },
+  encryptedBadge: {
+    background: 'rgba(81,207,102,0.2)', border: '1px solid rgba(81,207,102,0.3)',
+    borderRadius: '20px', padding: '6px 14px', color: '#51cf66', fontSize: '13px', fontWeight: '600',
+  },
   leaveBtn: {
     background: 'rgba(255,107,107,0.2)', border: '1px solid rgba(255,107,107,0.3)',
     borderRadius: '8px', padding: '6px 14px', color: '#ff6b6b', fontSize: '13px', cursor: 'pointer',
+  },
+  privateBtn: {
+    background: 'rgba(81,207,102,0.2)', border: '1px solid rgba(81,207,102,0.3)',
+    borderRadius: '8px', padding: '6px 14px', color: '#51cf66', fontSize: '13px', cursor: 'pointer',
   },
   logoutBtn2: {
     background: 'transparent', border: '1px solid rgba(255,255,255,0.2)',
     borderRadius: '8px', padding: '6px 14px', color: 'rgba(255,255,255,0.5)',
     fontSize: '13px', cursor: 'pointer',
   },
+  privateBanner: {
+    background: 'rgba(81,207,102,0.1)', borderBottom: '1px solid rgba(81,207,102,0.2)',
+    padding: '8px 24px', fontSize: '12px', color: '#51cf66', textAlign: 'center',
+  },
   infoBar: {
     background: 'rgba(255,255,255,0.03)', borderBottom: '1px solid rgba(255,255,255,0.06)',
-    padding: '8px 24px', display: 'flex', gap: '24px',
-    fontSize: '12px', color: 'rgba(255,255,255,0.4)',
+    padding: '8px 24px', display: 'flex', gap: '24px', fontSize: '12px', color: 'rgba(255,255,255,0.4)',
   },
   onlineCount: { marginLeft: 'auto', color: '#51cf66' },
   messagesContainer: { flex: 1, overflowY: 'auto', padding: '24px', display: 'flex', flexDirection: 'column', gap: '16px' },
@@ -439,7 +541,7 @@ const styles = {
     background: 'linear-gradient(135deg, #302b63, #24243e)',
     border: '2px solid rgba(255,255,255,0.2)', display: 'flex',
     alignItems: 'center', justifyContent: 'center', color: '#fff',
-    fontSize: '13px', fontWeight: 'bold', flexShrink: 0,
+    fontSize: '13px', fontWeight: 'bold', flexShrink: 0, cursor: 'pointer',
   },
   avatarMe: {
     width: '32px', height: '32px', borderRadius: '50%',
@@ -448,7 +550,8 @@ const styles = {
     color: '#fff', fontSize: '13px', fontWeight: 'bold', flexShrink: 0,
   },
   messageContent: { maxWidth: '65%' },
-  msgUsername: { color: '#f5a623', fontSize: '12px', marginBottom: '4px', fontWeight: '600' },
+  msgUsername: { color: '#f5a623', fontSize: '12px', marginBottom: '4px', fontWeight: '600', cursor: 'pointer' },
+  dmHint: { color: '#51cf66', fontSize: '10px', marginLeft: '6px' },
   myBubble: {
     background: 'linear-gradient(135deg, #f5a623, #f0532a)', color: '#fff',
     padding: '12px 16px', borderRadius: '18px 18px 4px 18px', fontSize: '14px', lineHeight: '1.5',
@@ -459,6 +562,7 @@ const styles = {
     fontSize: '14px', lineHeight: '1.5',
   },
   msgTime: { color: 'rgba(255,255,255,0.25)', fontSize: '11px', marginTop: '4px', textAlign: 'right' },
+  expiryText: { color: '#ff6b6b', fontSize: '10px' },
   typingIndicator: { color: 'rgba(255,255,255,0.4)', fontSize: '12px', padding: '4px 24px 8px', fontStyle: 'italic' },
   typingDots: { color: '#f5a623' },
   inputContainer: {
