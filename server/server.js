@@ -76,6 +76,7 @@ io.on('connection', (socket) => {
   socket.on('register_user', (username) => {
     onlineUsers.set(username, socket.id);
     console.log(`👤 ${username} registered with socket ${socket.id}`);
+    io.emit('online_users_list', Array.from(onlineUsers.keys()));
   });
 
   socket.on('join_room', async (room) => {
@@ -211,6 +212,7 @@ io.on('connection', (socket) => {
     onlineUsers.forEach((id, uname) => {
       if (id === socket.id) onlineUsers.delete(uname);
     });
+    io.emit('online_users_list', Array.from(onlineUsers.keys()));
   });
 });
 

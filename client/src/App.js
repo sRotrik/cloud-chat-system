@@ -3,6 +3,15 @@ import io from 'socket.io-client';
 
 const SERVER = process.env.REACT_APP_SERVER_URL || 'http://localhost:3001';
 
+const OnlineDot = ({ isOnline }) => (
+  <span style={{
+    position: 'absolute', bottom: '0', right: '0',
+    width: '12px', height: '12px', borderRadius: '50%',
+    background: isOnline ? '#51cf66' : '#555',
+    border: '2px solid #0f0c29',
+  }} />
+);
+
 function App() {
   const [screen, setScreen] = useState('login');
   const [username, setUsername] = useState('');
@@ -14,6 +23,7 @@ function App() {
   const [messages, setMessages] = useState([]);
   const [typing, setTyping] = useState('');
   const [onlineUsers, setOnlineUsers] = useState(0);
+  const [onlineUsersList, setOnlineUsersList] = useState([]);
   const [connected, setConnected] = useState(false);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
@@ -151,6 +161,7 @@ function App() {
       setTimeout(() => setTyping(''), 2000);
     });
     socket.on('online_count', (count) => setOnlineUsers(count));
+    socket.on('online_users_list', (list) => setOnlineUsersList(list));
     socket.on('private_history', (history) => setPrivateMessages(history));
     socket.on('receive_private', (msg) => {
       setPrivateMessages(prev => [...prev, msg]);
@@ -267,6 +278,7 @@ function App() {
   };
 
   const totalUnread = conversations.reduce((acc, c) => acc + getUnreadCount(c), 0);
+  const isOnline = (uname) => onlineUsersList.includes(uname);
 
   // ─── LOGIN ───
   if (screen === 'login') return (
@@ -402,10 +414,16 @@ function App() {
             {searchResults.length === 0 && <p style={styles.noResults}>No users found for "{searchQuery}"</p>}
             {searchResults.filter(u => u.username !== username).map((u, i) => (
               <div key={i} style={styles.convCard} onClick={() => openPrivateChat(u.username)}>
-                <div style={styles.convAvatar}>{u.username.charAt(0).toUpperCase()}</div>
+                <div style={{...styles.convAvatar, position: 'relative'}}>
+                  {u.username.charAt(0).toUpperCase()}
+                  <OnlineDot isOnline={isOnline(u.username)} />
+                </div>
                 <div style={styles.convInfo}>
                   <div style={styles.convHeader}>
                     <span style={styles.convName}>{u.username}</span>
+                    <span style={{...styles.onlineStatusText, color: isOnline(u.username) ? '#51cf66' : '#888'}}>
+                      {isOnline(u.username) ? '● Online' : '○ Offline'}
+                    </span>
                   </div>
                   <div style={styles.convLastMsg}>🔒 Start encrypted chat</div>
                 </div>
@@ -421,7 +439,10 @@ function App() {
               const unread = getUnreadCount(conv);
               return (
                 <div key={i} style={{...styles.convCard, ...(unread > 0 ? styles.convCardUnread : {})}} onClick={() => openPrivateChat(other)}>
-                  <div style={styles.convAvatar}>{other.charAt(0).toUpperCase()}</div>
+                  <div style={{...styles.convAvatar, position: 'relative'}}>
+                    {other.charAt(0).toUpperCase()}
+                    <OnlineDot isOnline={isOnline(other)} />
+                  </div>
                   <div style={styles.convInfo}>
                     <div style={styles.convHeader}>
                       <span style={styles.convName}>{other}</span>
@@ -441,10 +462,16 @@ function App() {
             <p style={styles.sectionTitle}>All Users</p>
             {usersList.filter(u => u.username !== username).map((u, i) => (
               <div key={i} style={styles.convCard} onClick={() => openPrivateChat(u.username)}>
-                <div style={styles.convAvatar}>{u.username.charAt(0).toUpperCase()}</div>
+                <div style={{...styles.convAvatar, position: 'relative'}}>
+                  {u.username.charAt(0).toUpperCase()}
+                  <OnlineDot isOnline={isOnline(u.username)} />
+                </div>
                 <div style={styles.convInfo}>
                   <div style={styles.convHeader}>
                     <span style={styles.convName}>{u.username}</span>
+                    <span style={{...styles.onlineStatusText, color: isOnline(u.username) ? '#51cf66' : '#888'}}>
+                      {isOnline(u.username) ? '● Online' : '○ Offline'}
+                    </span>
                   </div>
                   <div style={styles.convLastMsg}>🔒 Tap to message</div>
                 </div>
@@ -464,10 +491,18 @@ function App() {
       <div style={styles.header}>
         <div style={styles.headerLeft}>
           <button style={styles.backBtn} onClick={() => setScreen('users')}>←</button>
-          <div style={styles.convAvatar}>{privateUser.charAt(0).toUpperCase()}</div>
+          <div style={{...styles.convAvatar, position: 'relative'}}>
+            {privateUser.charAt(0).toUpperCase()}
+            <OnlineDot isOnline={isOnline(privateUser)} />
+          </div>
           <div>
             <h2 style={styles.headerTitle}>{privateUser}</h2>
-            <p style={styles.headerSub}>🔒 E2E Encrypted • Auto-deletes 10min</p>
+            <p style={styles.headerSub}>
+              <span style={{color: isOnline(privateUser) ? '#51cf66' : '#888'}}>
+                {isOnline(privateUser) ? '● Online' : '○ Offline'}
+              </span>
+              {' • '}🔒 E2E • 10min delete
+            </p>
           </div>
         </div>
         <div style={styles.headerRight}>
@@ -573,14 +608,18 @@ function App() {
         {messages.map((m, i) => (
           <div key={i} style={m.username === username ? styles.myMessageWrapper : styles.otherMessageWrapper}>
             {m.username !== username && (
-              <div style={styles.avatarSmall} onClick={() => openPrivateChat(m.username)} title="DM">
+              <div style={{...styles.avatarSmall, position: 'relative'}} onClick={() => openPrivateChat(m.username)} title="DM">
                 {m.username.charAt(0).toUpperCase()}
+                <OnlineDot isOnline={isOnline(m.username)} />
               </div>
             )}
             <div style={styles.messageContent}>
               {m.username !== username && (
                 <div style={styles.msgUsername} onClick={() => openPrivateChat(m.username)}>
-                  {m.username} <span style={styles.dmHint}>DM</span>
+                  {m.username}
+                  <span style={{...styles.dmHint, color: isOnline(m.username) ? '#51cf66' : '#888'}}>
+                    {isOnline(m.username) ? ' ● online' : ' ○ offline'}
+                  </span>
                 </div>
               )}
               <div className="msg-bubble" style={m.username === username ? styles.myBubble : styles.otherBubble}>
@@ -619,7 +658,7 @@ function App() {
 const styles = {
   authContainer: {
     display: 'flex', alignItems: 'center', justifyContent: 'center',
-    minHeight: '100vh', 
+    minHeight: '100vh',
     background: 'linear-gradient(135deg, #0f0c29, #302b63, #24243e)',
     padding: '16px',
   },
@@ -680,8 +719,7 @@ const styles = {
   },
   chatContainer: {
     display: 'flex', flexDirection: 'column',
-    height: '100vh',
-    background: '#0f0c29', overflow: 'hidden',
+    height: '100vh', background: '#0f0c29', overflow: 'hidden',
   },
   header: {
     background: 'linear-gradient(135deg, #302b63, #0f0c29)',
@@ -798,6 +836,7 @@ const styles = {
     borderRadius: '8px', padding: '5px 10px', color: '#51cf66',
     fontSize: '12px', cursor: 'pointer', flexShrink: 0,
   },
+  onlineStatusText: { fontSize: '10px', fontWeight: '600', flexShrink: 0 },
   messagesContainer: {
     flex: 1, overflowY: 'auto', padding: '12px 16px',
     display: 'flex', flexDirection: 'column', gap: '10px',
@@ -827,7 +866,7 @@ const styles = {
   },
   messageContent: { maxWidth: '75%' },
   msgUsername: { color: '#f5a623', fontSize: '11px', marginBottom: '3px', fontWeight: '600', cursor: 'pointer' },
-  dmHint: { color: '#51cf66', fontSize: '9px', marginLeft: '4px' },
+  dmHint: { fontSize: '9px', marginLeft: '4px' },
   myBubble: {
     background: 'linear-gradient(135deg, #f5a623, #f0532a)', color: '#fff',
     padding: '10px 14px', borderRadius: '18px 18px 4px 18px',
@@ -849,7 +888,6 @@ const styles = {
     display: 'flex', gap: '8px', padding: '10px 16px 16px',
     borderTop: '1px solid rgba(255,255,255,0.08)',
     background: 'rgba(255,255,255,0.02)', alignItems: 'center', flexShrink: 0,
-    paddingBottom: 'max(16px, env(safe-area-inset-bottom))',
   },
   messageInput: {
     flex: 1, padding: '12px 16px', borderRadius: '25px',
