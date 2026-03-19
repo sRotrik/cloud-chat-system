@@ -90,6 +90,10 @@ io.on('connection', (socket) => {
     io.to(data.room).emit('receive_message', {
       username: data.username,
       message: data.message,
+      fileUrl: data.fileUrl,
+      fileId: data.fileId,
+      mimetype: data.mimetype,
+      originalName: data.originalName,
       timestamp: msg.timestamp,
       expiresAt: msg.expiresAt,
     });
