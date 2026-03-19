@@ -22,7 +22,7 @@ function App() {
   const [privateMessages, setPrivateMessages] = useState([]);
   const [privateTyping, setPrivateTyping] = useState('');
   const [privateMessage, setPrivateMessage] = useState('');
-  const [usersList, setUsersList] = useState([]);
+  const [usersList, setUsersList] = useState([]); // eslint-disable-line no-unused-vars
   const socketRef = useRef(null);
   const bottomRef = useRef(null);
   const privateBottomRef = useRef(null);
