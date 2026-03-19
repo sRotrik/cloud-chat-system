@@ -49,13 +49,17 @@ mongoose.connect(MONGO)
   .then(() => console.log('✅ MongoDB Connected'))
   .catch(err => console.log('❌ MongoDB Error:', err.message));
 
+// Group message schema with auto-delete after 10 minutes
 const MessageSchema = new mongoose.Schema({
   room: String,
   username: String,
   message: String,
-  timestamp: { type: Date, default: Date.now }
+  timestamp: { type: Date, default: Date.now },
+  expiresAt: { type: Date, default: () => new Date(Date.now() + 10 * 60 * 1000) }
 });
+MessageSchema.index({ expiresAt: 1 }, { expireAfterSeconds: 0 });
 const Message = mongoose.model('Message', MessageSchema);
+
 const PrivateMessage = require('./models/PrivateMessage');
 
 const onlineUsers = new Map();
@@ -78,12 +82,14 @@ io.on('connection', (socket) => {
   });
 
   socket.on('send_message', async (data) => {
-    const msg = new Message(data);
+    const expiresAt = new Date(Date.now() + 10 * 60 * 1000);
+    const msg = new Message({ ...data, expiresAt });
     await msg.save();
     io.to(data.room).emit('receive_message', {
       username: data.username,
       message: data.message,
-      timestamp: msg.timestamp
+      timestamp: msg.timestamp,
+      expiresAt: msg.expiresAt,
     });
   });
 

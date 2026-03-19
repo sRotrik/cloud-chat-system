@@ -441,7 +441,10 @@ function App() {
               <div style={m.username === username ? styles.myBubble : styles.otherBubble}>
                 {m.message}
               </div>
-              <div style={styles.msgTime}>{new Date(m.timestamp).toLocaleTimeString()}</div>
+              <div style={styles.msgTime}>
+                {new Date(m.timestamp).toLocaleTimeString()}
+                {m.expiresAt && <span style={styles.expiryText}> • 🔥 deletes {new Date(m.expiresAt).toLocaleTimeString()}</span>}
+              </div>
             </div>
             {m.username === username && <div style={styles.avatarMe}>{username.charAt(0).toUpperCase()}</div>}
           </div>
