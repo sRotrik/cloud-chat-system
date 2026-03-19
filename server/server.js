@@ -24,6 +24,7 @@ app.use(express.json());
 
 const authRoutes = require('./routes/auth');
 const { router: privateRoutes, getSharedKey, getRoomId } = require('./routes/private');
+const mediaRoutes = require('./routes/media');
 app.use('/auth', authRoutes);
 app.use('/private', privateRoutes);
 app.use('/media', mediaRoutes);
