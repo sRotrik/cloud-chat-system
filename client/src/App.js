@@ -619,7 +619,7 @@ function App() {
 const styles = {
   authContainer: {
     display: 'flex', alignItems: 'center', justifyContent: 'center',
-    minHeight: '100vh', minHeight: '-webkit-fill-available',
+    minHeight: '100vh', 
     background: 'linear-gradient(135deg, #0f0c29, #302b63, #24243e)',
     padding: '16px',
   },
@@ -680,7 +680,7 @@ const styles = {
   },
   chatContainer: {
     display: 'flex', flexDirection: 'column',
-    height: '100vh', height: '-webkit-fill-available',
+    height: '100vh',
     background: '#0f0c29', overflow: 'hidden',
   },
   header: {
