@@ -22,6 +22,9 @@ function App() {
   const [privateTyping, setPrivateTyping] = useState('');
   const [privateMessage, setPrivateMessage] = useState('');
   const [usersList, setUsersList] = useState([]);
+  const [conversations, setConversations] = useState([]);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [searchResults, setSearchResults] = useState([]);
   const [notification, setNotification] = useState('');
   const [uploading, setUploading] = useState(false);
   const socketRef = useRef(null);
@@ -108,18 +111,35 @@ function App() {
       const res = await fetch(`${SERVER}/private/users`);
       const data = await res.json();
       setUsersList(data);
-    } catch (err) {
-      console.log('Error fetching users:', err);
-    }
+    } catch (err) { console.log('Error fetching users:', err); }
   };
 
-  const joinRoom = () => {
+  const fetchConversations = async (uname) => {
+    try {
+      const res = await fetch(`${SERVER}/private/conversations/${uname}`);
+      const data = await res.json();
+      setConversations(data);
+    } catch (err) { console.log('Error fetching conversations:', err); }
+  };
+
+  const handleSearch = async (query) => {
+    setSearchQuery(query);
+    if (query.trim().length < 1) { setSearchResults([]); return; }
+    try {
+      const res = await fetch(`${SERVER}/private/search/${query}`);
+      const data = await res.json();
+      setSearchResults(data);
+    } catch (err) { console.log('Search error:', err); }
+  };
+
+  const joinRoom = (savedUsername) => {
+    const uname = savedUsername || username;
     const socket = io(SERVER, { auth: { token }, reconnection: true });
     socketRef.current = socket;
 
     socket.on('connect', () => {
       setConnected(true);
-      socket.emit('register_user', username);
+      socket.emit('register_user', uname);
     });
 
     socket.on('disconnect', () => setConnected(false));
@@ -132,18 +152,23 @@ function App() {
     });
     socket.on('online_count', (count) => setOnlineUsers(count));
     socket.on('private_history', (history) => setPrivateMessages(history));
-    socket.on('receive_private', (msg) => setPrivateMessages(prev => [...prev, msg]));
+    socket.on('receive_private', (msg) => {
+      setPrivateMessages(prev => [...prev, msg]);
+      fetchConversations(uname);
+    });
     socket.on('private_user_typing', (user) => {
       setPrivateTyping(`${user} is typing...`);
       setTimeout(() => setPrivateTyping(''), 2000);
     });
-    socket.on('private_notification', ({ from }) => {
-      setNotification(`🔒 New private message from ${from}!`);
+    socket.on('private_notification', ({ from, message: notifMsg }) => {
+      setNotification(`🔒 ${from}: ${notifMsg?.substring(0, 30)}`);
       setTimeout(() => setNotification(''), 5000);
+      fetchConversations(uname);
     });
 
     setScreen('chat');
     fetchUsers();
+    fetchConversations(uname);
   };
 
   const openPrivateChat = (targetUser) => {
@@ -151,8 +176,11 @@ function App() {
     setPrivateMessages([]);
     if (socketRef.current) {
       socketRef.current.emit('join_private', { from: username, to: targetUser });
+      socketRef.current.emit('mark_read', { from: username, to: targetUser });
     }
+    setSearchQuery(''); setSearchResults([]);
     setScreen('private');
+    setTimeout(() => fetchConversations(username), 500);
   };
 
   const sendMessage = () => {
@@ -164,12 +192,9 @@ function App() {
 
   const sendPrivateMessage = () => {
     if (privateMessage.trim() && socketRef.current) {
-      socketRef.current.emit('send_private', {
-        from: username,
-        to: privateUser,
-        message: privateMessage,
-      });
+      socketRef.current.emit('send_private', { from: username, to: privateUser, message: privateMessage });
       setPrivateMessage('');
+      setTimeout(() => fetchConversations(username), 500);
     }
   };
 
@@ -186,31 +211,19 @@ function App() {
   const handleFileUpload = async (e) => {
     const file = e.target.files[0];
     if (!file) return;
-
-    if (file.size > 10 * 1024 * 1024) {
-      alert('File size must be under 10MB');
-      return;
-    }
-
+    if (file.size > 10 * 1024 * 1024) { alert('File size must be under 10MB'); return; }
     setUploading(true);
     try {
       const formData = new FormData();
       formData.append('file', file);
       formData.append('username', username);
       formData.append('room', room);
-
-      const res = await fetch(`${SERVER}/media/upload`, {
-        method: 'POST',
-        body: formData,
-      });
+      const res = await fetch(`${SERVER}/media/upload`, { method: 'POST', body: formData });
       const data = await res.json();
       if (data.error) { alert(data.error); return; }
-
-      // Send file message
       if (socketRef.current) {
         socketRef.current.emit('send_message', {
-          room,
-          username,
+          room, username,
           message: `📎 ${data.originalName}`,
           fileId: data.fileId,
           fileUrl: `${SERVER}/media/file/${data.fileId}`,
@@ -218,12 +231,8 @@ function App() {
           originalName: data.originalName,
         });
       }
-    } catch (err) {
-      alert('Upload failed: ' + err.message);
-    } finally {
-      setUploading(false);
-      e.target.value = '';
-    }
+    } catch (err) { alert('Upload failed: ' + err.message); }
+    finally { setUploading(false); e.target.value = ''; }
   };
 
   const leaveRoom = () => {
@@ -234,37 +243,35 @@ function App() {
   const renderMedia = (msg) => {
     if (!msg.fileUrl) return null;
     const mime = msg.mimetype || '';
-
-    if (mime.startsWith('image/')) {
-      return (
-        <img src={msg.fileUrl} alt={msg.originalName}
-          style={styles.mediaImage}
-          onClick={() => window.open(msg.fileUrl, '_blank')} />
-      );
-    }
-    if (mime.startsWith('video/')) {
-      return (
-        <video controls style={styles.mediaVideo}>
-          <source src={msg.fileUrl} type={mime} />
-        </video>
-      );
-    }
-    if (mime.startsWith('audio/')) {
-      return (
-        <audio controls style={styles.mediaAudio}>
-          <source src={msg.fileUrl} type={mime} />
-        </audio>
-      );
-    }
-    return (
-      <a href={msg.fileUrl} target="_blank" rel="noreferrer" style={styles.fileLink}>
-        📎 {msg.originalName}
-      </a>
-    );
+    if (mime.startsWith('image/')) return <img src={msg.fileUrl} alt={msg.originalName} style={styles.mediaImage} onClick={() => window.open(msg.fileUrl, '_blank')} />;
+    if (mime.startsWith('video/')) return <video controls style={styles.mediaVideo}><source src={msg.fileUrl} type={mime} /></video>;
+    if (mime.startsWith('audio/')) return <audio controls style={styles.mediaAudio}><source src={msg.fileUrl} type={mime} /></audio>;
+    return <a href={msg.fileUrl} target="_blank" rel="noreferrer" style={styles.fileLink}>📎 {msg.originalName}</a>;
   };
 
+  const getUnreadCount = (conv) => {
+    if (!conv.unreadCount) return 0;
+    return conv.unreadCount[username] || 0;
+  };
+
+  const getOtherParticipant = (conv) => conv.participants.find(p => p !== username) || '';
+
+  const formatTime = (date) => {
+    if (!date) return '';
+    const d = new Date(date);
+    const diff = new Date() - d;
+    if (diff < 60000) return 'now';
+    if (diff < 3600000) return `${Math.floor(diff / 60000)}m`;
+    if (diff < 86400000) return `${Math.floor(diff / 3600000)}h`;
+    return d.toLocaleDateString();
+  };
+
+  const totalUnread = conversations.reduce((acc, c) => acc + getUnreadCount(c), 0);
+
+  // ─── LOGIN ───
   if (screen === 'login') return (
     <div style={styles.authContainer}>
+      <style>{`* { box-sizing: border-box; } body { margin: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; }`}</style>
       <div style={styles.authBox}>
         <div style={styles.logoContainer}>
           <span style={styles.logoIcon}>☁️</span>
@@ -299,8 +306,10 @@ function App() {
     </div>
   );
 
+  // ─── REGISTER ───
   if (screen === 'register') return (
     <div style={styles.authContainer}>
+      <style>{`* { box-sizing: border-box; } body { margin: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; }`}</style>
       <div style={styles.authBox}>
         <div style={styles.logoContainer}>
           <span style={styles.logoIcon}>☁️</span>
@@ -338,8 +347,10 @@ function App() {
     </div>
   );
 
+  // ─── ROOM SELECT ───
   if (screen === 'room') return (
     <div style={styles.authContainer}>
+      <style>{`* { box-sizing: border-box; } body { margin: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; }`}</style>
       <div style={styles.authBox}>
         <div style={styles.logoContainer}>
           <span style={styles.logoIcon}>☁️</span>
@@ -355,101 +366,142 @@ function App() {
             <option value="random">🎲 Random</option>
           </select>
         </div>
-        <button style={styles.primaryBtn} onClick={joinRoom}>Join #{room} →</button>
+        <button style={styles.primaryBtn} onClick={() => joinRoom(username)}>Join #{room} →</button>
         <button style={styles.logoutBtn} onClick={handleLogout}>Sign Out</button>
       </div>
     </div>
   );
 
+  // ─── DM LIST ───
   if (screen === 'users') return (
     <div style={styles.chatContainer}>
+      <style>{`* { box-sizing: border-box; } body { margin: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; }`}</style>
       <div style={styles.header}>
         <div style={styles.headerLeft}>
-          <span style={styles.headerIcon}>👥</span>
+          <span style={styles.headerIcon}>💬</span>
           <div>
-            <h2 style={styles.headerTitle}>Direct Messages</h2>
-            <p style={styles.headerSub}>End-to-End Encrypted • Auto-deletes in 10 min</p>
+            <h2 style={styles.headerTitle}>Messages</h2>
+            <p style={styles.headerSub}>🔒 E2E Encrypted</p>
           </div>
         </div>
         <div style={styles.headerRight}>
           <div style={styles.userBadge}>👤 {username}</div>
-          <button style={styles.leaveBtn} onClick={() => setScreen('chat')}>Back</button>
-          <button style={styles.logoutBtn2} onClick={handleLogout}>Logout</button>
+          <button style={styles.leaveBtn} onClick={() => setScreen('chat')}>← Back</button>
         </div>
       </div>
-      <div style={styles.messagesContainer}>
-        {usersList.filter(u => u.username !== username).length === 0 && (
-          <div style={styles.emptyState}>
-            <div style={styles.emptyIcon}>👥</div>
-            <p style={styles.emptyText}>No other users yet</p>
-            <p style={styles.emptySubtext}>Users appear here once they register</p>
+      <div style={styles.searchContainer}>
+        <input style={styles.searchInput}
+          placeholder="🔍 Search users..."
+          value={searchQuery}
+          onChange={e => handleSearch(e.target.value)} />
+      </div>
+      <div style={styles.dmListContainer}>
+        {searchQuery.length > 0 ? (
+          <div>
+            <p style={styles.sectionTitle}>Search Results</p>
+            {searchResults.length === 0 && <p style={styles.noResults}>No users found for "{searchQuery}"</p>}
+            {searchResults.filter(u => u.username !== username).map((u, i) => (
+              <div key={i} style={styles.convCard} onClick={() => openPrivateChat(u.username)}>
+                <div style={styles.convAvatar}>{u.username.charAt(0).toUpperCase()}</div>
+                <div style={styles.convInfo}>
+                  <div style={styles.convHeader}>
+                    <span style={styles.convName}>{u.username}</span>
+                  </div>
+                  <div style={styles.convLastMsg}>🔒 Start encrypted chat</div>
+                </div>
+                <span style={styles.dmStartBtn}>DM</span>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div>
+            {conversations.length > 0 && <p style={styles.sectionTitle}>Recent</p>}
+            {conversations.map((conv, i) => {
+              const other = getOtherParticipant(conv);
+              const unread = getUnreadCount(conv);
+              return (
+                <div key={i} style={{...styles.convCard, ...(unread > 0 ? styles.convCardUnread : {})}} onClick={() => openPrivateChat(other)}>
+                  <div style={styles.convAvatar}>{other.charAt(0).toUpperCase()}</div>
+                  <div style={styles.convInfo}>
+                    <div style={styles.convHeader}>
+                      <span style={styles.convName}>{other}</span>
+                      <span style={styles.convTime}>{formatTime(conv.lastMessageTime)}</span>
+                    </div>
+                    <div style={styles.convFooter}>
+                      <span style={styles.convLastMsg}>
+                        {conv.lastMessageFrom === username ? '✓ You: ' : ''}
+                        {conv.lastMessage?.substring(0, 30)}{conv.lastMessage?.length > 30 ? '...' : ''}
+                      </span>
+                      {unread > 0 && <span style={styles.unreadBadge}>{unread}</span>}
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+            <p style={styles.sectionTitle}>All Users</p>
+            {usersList.filter(u => u.username !== username).map((u, i) => (
+              <div key={i} style={styles.convCard} onClick={() => openPrivateChat(u.username)}>
+                <div style={styles.convAvatar}>{u.username.charAt(0).toUpperCase()}</div>
+                <div style={styles.convInfo}>
+                  <div style={styles.convHeader}>
+                    <span style={styles.convName}>{u.username}</span>
+                  </div>
+                  <div style={styles.convLastMsg}>🔒 Tap to message</div>
+                </div>
+                <span style={styles.dmStartBtn}>DM</span>
+              </div>
+            ))}
           </div>
         )}
-        {usersList.filter(u => u.username !== username).map((u, i) => (
-          <div key={i} style={styles.userCard} onClick={() => openPrivateChat(u.username)}>
-            <div style={styles.userCardAvatar}>{u.username.charAt(0).toUpperCase()}</div>
-            <div style={styles.userCardInfo}>
-              <div style={styles.userCardName}>{u.username}</div>
-              <div style={styles.userCardSub}>🔒 Click to send encrypted message</div>
-            </div>
-            <button style={styles.dmStartBtn}>💬 DM</button>
-          </div>
-        ))}
       </div>
     </div>
   );
 
+  // ─── PRIVATE CHAT ───
   if (screen === 'private') return (
     <div style={styles.chatContainer}>
+      <style>{`* { box-sizing: border-box; } body { margin: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; }`}</style>
       <div style={styles.header}>
         <div style={styles.headerLeft}>
-          <span style={styles.headerIcon}>🔐</span>
+          <button style={styles.backBtn} onClick={() => setScreen('users')}>←</button>
+          <div style={styles.convAvatar}>{privateUser.charAt(0).toUpperCase()}</div>
           <div>
-            <h2 style={styles.headerTitle}>Private: {privateUser}</h2>
-            <p style={styles.headerSub}>End-to-End Encrypted • Auto-deletes in 10 min</p>
+            <h2 style={styles.headerTitle}>{privateUser}</h2>
+            <p style={styles.headerSub}>🔒 E2E Encrypted • Auto-deletes 10min</p>
           </div>
         </div>
         <div style={styles.headerRight}>
-          <div style={styles.encryptedBadge}>🔒 E2E Encrypted</div>
-          <div style={styles.userBadge}>👤 {username}</div>
-          <button style={styles.leaveBtn} onClick={() => setScreen('users')}>Back</button>
           <button style={styles.logoutBtn2} onClick={handleLogout}>Logout</button>
         </div>
       </div>
       <div style={styles.privateBanner}>
-        🔐 AES-256 Encrypted • 🕐 Auto-deleted after 10 minutes • 👁️ Only you and {privateUser} can read these
+        🔐 AES-256 • 🕐 10min auto-delete • 👁️ Only you & {privateUser}
       </div>
       <div style={styles.messagesContainer}>
         {privateMessages.length === 0 && (
           <div style={styles.emptyState}>
             <div style={styles.emptyIcon}>🔐</div>
-            <p style={styles.emptyText}>Encrypted Private Chat</p>
-            <p style={styles.emptySubtext}>Messages auto-delete after 10 minutes</p>
+            <p style={styles.emptyText}>Encrypted Chat</p>
+            <p style={styles.emptySubtext}>Messages delete after 10 minutes</p>
           </div>
         )}
         {privateMessages.map((m, i) => (
           <div key={i} style={m.from === username ? styles.myMessageWrapper : styles.otherMessageWrapper}>
-            {m.from !== username && <div style={styles.avatar}>{m.from.charAt(0).toUpperCase()}</div>}
+            {m.from !== username && <div style={styles.avatarSmall}>{m.from.charAt(0).toUpperCase()}</div>}
             <div style={styles.messageContent}>
               {m.from !== username && <div style={styles.msgUsername}>{m.from}</div>}
-              <div style={m.from === username ? styles.myBubble : styles.otherBubble}>
-                🔒 {m.message}
-              </div>
+              <div style={m.from === username ? styles.myBubble : styles.otherBubble}>🔒 {m.message}</div>
               <div style={styles.msgTime}>
                 {new Date(m.timestamp).toLocaleTimeString()}
-                {m.expiresAt && <span style={styles.expiryText}> • expires {new Date(m.expiresAt).toLocaleTimeString()}</span>}
+                {m.expiresAt && <span style={styles.expiryText}> • 🔥 {new Date(m.expiresAt).toLocaleTimeString()}</span>}
               </div>
             </div>
-            {m.from === username && <div style={styles.avatarMe}>{username.charAt(0).toUpperCase()}</div>}
+            {m.from === username && <div style={styles.avatarMeSmall}>{username.charAt(0).toUpperCase()}</div>}
           </div>
         ))}
         <div ref={privateBottomRef} />
       </div>
-      {privateTyping && (
-        <div style={styles.typingIndicator}>
-          <span style={styles.typingDots}>•••</span> {privateTyping}
-        </div>
-      )}
+      {privateTyping && <div style={styles.typingIndicator}><span style={styles.typingDots}>•••</span> {privateTyping}</div>}
       <div style={styles.inputContainer}>
         <input style={styles.messageInput}
           placeholder="Encrypted message..."
@@ -461,40 +513,55 @@ function App() {
     </div>
   );
 
+  // ─── MAIN CHAT ───
   return (
     <div style={styles.chatContainer}>
+      <style>{`
+        * { box-sizing: border-box; }
+        body { margin: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; }
+        ::-webkit-scrollbar { width: 4px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.15); border-radius: 4px; }
+        .msg-bubble:hover { filter: brightness(1.1); }
+      `}</style>
+
       {notification && (
-        <div style={styles.notificationBanner}>{notification}</div>
+        <div style={styles.notificationBanner} onClick={() => { setScreen('users'); setNotification(''); }}>
+          {notification} — tap to view
+        </div>
       )}
+
       <div style={styles.header}>
         <div style={styles.headerLeft}>
           <span style={styles.headerIcon}>☁️</span>
           <div>
             <h2 style={styles.headerTitle}>#{room}</h2>
-            <p style={styles.headerSub}>Cloud-Native Chat System</p>
+            <p style={styles.headerSub}>CloudChat</p>
           </div>
         </div>
         <div style={styles.headerRight}>
-          <div style={styles.statusBadge}>
+          <div style={{...styles.statusBadge, display: 'flex'}}>
             <span style={connected ? styles.dotGreen : styles.dotRed}>●</span>
-            <span style={styles.statusText}>{connected ? 'Connected' : 'Disconnected'}</span>
           </div>
-          <div style={styles.userBadge}>👤 {username}</div>
-          <button style={styles.privateBtn} onClick={() => { fetchUsers(); setScreen('users'); }}>💬 DM</button>
-          <button style={styles.leaveBtn} onClick={leaveRoom}>Leave</button>
-          <button style={styles.logoutBtn2} onClick={handleLogout}>Logout</button>
+          <button style={styles.privateBtn} onClick={() => { fetchUsers(); fetchConversations(username); setScreen('users'); }}>
+            💬 {totalUnread > 0 && <span style={styles.unreadBadgeSmall}>{totalUnread}</span>}
+          </button>
+          <button style={styles.leaveBtn} onClick={leaveRoom}>⬅</button>
+          <button style={styles.logoutBtn2} onClick={handleLogout}>⏻</button>
         </div>
       </div>
+
       <div style={styles.infoBar}>
-        <span>⚡ WebSocket</span>
-        <span>🔴 Redis Pub/Sub</span>
+        <span>⚡ WS</span>
+        <span>🔴 Redis</span>
         <span>🍃 MongoDB</span>
         <span>🐳 Docker</span>
-        <span>🔐 JWT Auth</span>
-        <span>🔒 E2E Encrypt</span>
+        <span>🔐 JWT</span>
+        <span>🔒 E2E</span>
         <span>📎 Media</span>
-        <span style={styles.onlineCount}>🟢 {onlineUsers} online</span>
+        <span style={styles.onlineCount}>🟢 {onlineUsers}</span>
       </div>
+
       <div style={styles.messagesContainer}>
         {messages.length === 0 && (
           <div style={styles.emptyState}>
@@ -506,48 +573,36 @@ function App() {
         {messages.map((m, i) => (
           <div key={i} style={m.username === username ? styles.myMessageWrapper : styles.otherMessageWrapper}>
             {m.username !== username && (
-              <div style={styles.avatar} onClick={() => openPrivateChat(m.username)} title="Send private message">
+              <div style={styles.avatarSmall} onClick={() => openPrivateChat(m.username)} title="DM">
                 {m.username.charAt(0).toUpperCase()}
               </div>
             )}
             <div style={styles.messageContent}>
               {m.username !== username && (
                 <div style={styles.msgUsername} onClick={() => openPrivateChat(m.username)}>
-                  {m.username} <span style={styles.dmHint}>💬 DM</span>
+                  {m.username} <span style={styles.dmHint}>DM</span>
                 </div>
               )}
-              <div style={m.username === username ? styles.myBubble : styles.otherBubble}>
+              <div className="msg-bubble" style={m.username === username ? styles.myBubble : styles.otherBubble}>
                 {m.fileUrl ? renderMedia(m) : m.message}
               </div>
               <div style={styles.msgTime}>
                 {new Date(m.timestamp).toLocaleTimeString()}
-                {m.expiresAt && <span style={styles.expiryText}> • 🔥 deletes {new Date(m.expiresAt).toLocaleTimeString()}</span>}
+                {m.expiresAt && <span style={styles.expiryText}> 🔥 {new Date(m.expiresAt).toLocaleTimeString()}</span>}
               </div>
             </div>
-            {m.username === username && <div style={styles.avatarMe}>{username.charAt(0).toUpperCase()}</div>}
+            {m.username === username && <div style={styles.avatarMeSmall}>{username.charAt(0).toUpperCase()}</div>}
           </div>
         ))}
         <div ref={bottomRef} />
       </div>
-      {typing && (
-        <div style={styles.typingIndicator}>
-          <span style={styles.typingDots}>•••</span> {typing}
-        </div>
-      )}
+
+      {typing && <div style={styles.typingIndicator}><span style={styles.typingDots}>•••</span> {typing}</div>}
+
       <div style={styles.inputContainer}>
-        <input
-          type="file"
-          ref={fileInputRef}
-          onChange={handleFileUpload}
-          accept="image/*,video/*,audio/*"
-          style={{ display: 'none' }}
-        />
-        <button
-          style={styles.attachBtn}
-          onClick={() => fileInputRef.current.click()}
-          disabled={uploading}
-          title="Attach image, video or audio (max 10MB)"
-        >
+        <input type="file" ref={fileInputRef} onChange={handleFileUpload}
+          accept="image/*,video/*,audio/*" style={{ display: 'none' }} />
+        <button style={styles.attachBtn} onClick={() => fileInputRef.current.click()} disabled={uploading}>
           {uploading ? '⏳' : '📎'}
         </button>
         <input style={styles.messageInput}
@@ -564,18 +619,21 @@ function App() {
 const styles = {
   authContainer: {
     display: 'flex', alignItems: 'center', justifyContent: 'center',
-    minHeight: '100vh', background: 'linear-gradient(135deg, #0f0c29, #302b63, #24243e)',
+    minHeight: '100vh', minHeight: '-webkit-fill-available',
+    background: 'linear-gradient(135deg, #0f0c29, #302b63, #24243e)',
+    padding: '16px',
   },
   authBox: {
     background: 'rgba(255,255,255,0.05)', backdropFilter: 'blur(20px)',
     border: '1px solid rgba(255,255,255,0.1)', borderRadius: '24px',
-    padding: '48px 40px', width: '420px', display: 'flex',
-    flexDirection: 'column', gap: '16px', boxShadow: '0 32px 64px rgba(0,0,0,0.6)',
+    padding: '32px 24px', width: '100%', maxWidth: '420px',
+    display: 'flex', flexDirection: 'column', gap: '16px',
+    boxShadow: '0 32px 64px rgba(0,0,0,0.6)',
   },
   logoContainer: { display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '12px' },
-  logoIcon: { fontSize: '36px' },
+  logoIcon: { fontSize: '32px' },
   logo: {
-    color: '#fff', margin: 0, fontSize: '32px', fontWeight: '800',
+    color: '#fff', margin: 0, fontSize: '28px', fontWeight: '800',
     background: 'linear-gradient(135deg, #f5a623, #f0532a)',
     WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent',
   },
@@ -584,34 +642,33 @@ const styles = {
     background: 'rgba(255,107,107,0.2)', border: '1px solid rgba(255,107,107,0.4)',
     borderRadius: '8px', padding: '10px 14px', color: '#ff6b6b', fontSize: '13px',
   },
-  inputGroup: { display: 'flex', flexDirection: 'column', gap: '8px' },
-  label: { color: 'rgba(255,255,255,0.6)', fontSize: '13px', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '1px' },
+  inputGroup: { display: 'flex', flexDirection: 'column', gap: '6px' },
+  label: { color: 'rgba(255,255,255,0.6)', fontSize: '12px', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '1px' },
   input: {
     padding: '14px 16px', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.15)',
-    background: 'rgba(255,255,255,0.08)', color: '#fff', fontSize: '15px',
-    outline: 'none', width: '100%', boxSizing: 'border-box',
+    background: 'rgba(255,255,255,0.08)', color: '#fff', fontSize: '16px',
+    outline: 'none', width: '100%',
   },
   select: {
     padding: '14px 16px', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.15)',
-    background: '#1a1a3e', color: '#fff', fontSize: '15px', outline: 'none',
-    width: '100%', boxSizing: 'border-box',
+    background: '#1a1a3e', color: '#fff', fontSize: '16px', outline: 'none', width: '100%',
   },
   primaryBtn: {
     padding: '16px', background: 'linear-gradient(135deg, #f5a623, #f0532a)',
     border: 'none', borderRadius: '12px', color: '#fff', fontSize: '16px',
-    fontWeight: 'bold', cursor: 'pointer', width: '100%',
+    fontWeight: 'bold', cursor: 'pointer', width: '100%', touchAction: 'manipulation',
   },
   googleBtn: {
     padding: '14px', background: 'rgba(255,255,255,0.1)',
     border: '1px solid rgba(255,255,255,0.2)', borderRadius: '12px',
     color: '#fff', fontSize: '15px', cursor: 'pointer', width: '100%',
     display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px',
+    touchAction: 'manipulation',
   },
   googleIcon: {
     background: '#fff', color: '#4285f4', width: '24px', height: '24px',
-    borderRadius: '50%', display: 'flex', alignItems: 'center',
+    borderRadius: '50%', display: 'inline-flex', alignItems: 'center',
     justifyContent: 'center', fontWeight: 'bold', fontSize: '14px',
-    lineHeight: '24px', textAlign: 'center',
   },
   divider: { display: 'flex', alignItems: 'center', gap: '12px', color: 'rgba(255,255,255,0.3)', fontSize: '13px' },
   switchText: { color: 'rgba(255,255,255,0.4)', textAlign: 'center', fontSize: '13px', margin: 0 },
@@ -621,155 +678,205 @@ const styles = {
     border: '1px solid rgba(255,107,107,0.3)', borderRadius: '12px',
     color: '#ff6b6b', fontSize: '14px', cursor: 'pointer', width: '100%',
   },
-  chatContainer: { display: 'flex', flexDirection: 'column', height: '100vh', background: '#0f0c29' },
+  chatContainer: {
+    display: 'flex', flexDirection: 'column',
+    height: '100vh', height: '-webkit-fill-available',
+    background: '#0f0c29', overflow: 'hidden',
+  },
   header: {
-    background: 'linear-gradient(135deg, #302b63, #0f0c29)', padding: '14px 24px',
+    background: 'linear-gradient(135deg, #302b63, #0f0c29)',
+    padding: '10px 16px',
     display: 'flex', justifyContent: 'space-between', alignItems: 'center',
     borderBottom: '1px solid rgba(255,255,255,0.08)',
+    minHeight: '56px', flexShrink: 0,
   },
-  headerLeft: { display: 'flex', alignItems: 'center', gap: '12px' },
-  headerIcon: { fontSize: '28px' },
-  headerTitle: { color: '#fff', margin: 0, fontSize: '18px', fontWeight: '700' },
-  headerSub: { color: 'rgba(255,255,255,0.4)', margin: 0, fontSize: '11px' },
-  headerRight: { display: 'flex', alignItems: 'center', gap: '12px' },
-  statusBadge: {
-    display: 'flex', alignItems: 'center', gap: '6px',
-    background: 'rgba(255,255,255,0.08)', borderRadius: '20px', padding: '6px 12px',
-  },
-  dotGreen: { color: '#51cf66', fontSize: '10px' },
-  dotRed: { color: '#ff6b6b', fontSize: '10px' },
+  headerLeft: { display: 'flex', alignItems: 'center', gap: '10px' },
+  headerIcon: { fontSize: '24px' },
+  headerTitle: { color: '#fff', margin: 0, fontSize: '16px', fontWeight: '700' },
+  headerSub: { color: 'rgba(255,255,255,0.4)', margin: 0, fontSize: '10px' },
+  headerRight: { display: 'flex', alignItems: 'center', gap: '8px' },
+  statusBadge: { alignItems: 'center', gap: '4px' },
+  dotGreen: { color: '#51cf66', fontSize: '12px' },
+  dotRed: { color: '#ff6b6b', fontSize: '12px' },
   statusText: { color: 'rgba(255,255,255,0.7)', fontSize: '12px' },
   userBadge: {
     background: 'rgba(245,166,35,0.2)', border: '1px solid rgba(245,166,35,0.3)',
-    borderRadius: '20px', padding: '6px 14px', color: '#f5a623', fontSize: '13px', fontWeight: '600',
+    borderRadius: '20px', padding: '4px 10px', color: '#f5a623', fontSize: '12px', fontWeight: '600',
   },
   encryptedBadge: {
     background: 'rgba(81,207,102,0.2)', border: '1px solid rgba(81,207,102,0.3)',
-    borderRadius: '20px', padding: '6px 14px', color: '#51cf66', fontSize: '13px', fontWeight: '600',
+    borderRadius: '20px', padding: '4px 10px', color: '#51cf66', fontSize: '12px', fontWeight: '600',
   },
   leaveBtn: {
     background: 'rgba(255,107,107,0.2)', border: '1px solid rgba(255,107,107,0.3)',
-    borderRadius: '8px', padding: '6px 14px', color: '#ff6b6b', fontSize: '13px', cursor: 'pointer',
+    borderRadius: '8px', padding: '6px 12px', color: '#ff6b6b', fontSize: '14px',
+    cursor: 'pointer', touchAction: 'manipulation',
+  },
+  backBtn: {
+    background: 'transparent', border: 'none',
+    color: '#f5a623', fontSize: '20px', cursor: 'pointer', padding: '4px 8px',
+    touchAction: 'manipulation',
   },
   privateBtn: {
     background: 'rgba(81,207,102,0.2)', border: '1px solid rgba(81,207,102,0.3)',
-    borderRadius: '8px', padding: '6px 14px', color: '#51cf66', fontSize: '13px', cursor: 'pointer',
+    borderRadius: '8px', padding: '6px 12px', color: '#51cf66', fontSize: '14px',
+    cursor: 'pointer', position: 'relative', display: 'flex', alignItems: 'center', gap: '4px',
+    touchAction: 'manipulation',
+  },
+  unreadBadgeSmall: {
+    background: '#ff6b6b', color: '#fff', borderRadius: '10px',
+    padding: '1px 5px', fontSize: '10px', fontWeight: 'bold',
   },
   logoutBtn2: {
     background: 'transparent', border: '1px solid rgba(255,255,255,0.2)',
-    borderRadius: '8px', padding: '6px 14px', color: 'rgba(255,255,255,0.5)',
-    fontSize: '13px', cursor: 'pointer',
+    borderRadius: '8px', padding: '6px 10px', color: 'rgba(255,255,255,0.5)',
+    fontSize: '14px', cursor: 'pointer', touchAction: 'manipulation',
   },
   privateBanner: {
     background: 'rgba(81,207,102,0.1)', borderBottom: '1px solid rgba(81,207,102,0.2)',
-    padding: '8px 24px', fontSize: '12px', color: '#51cf66', textAlign: 'center',
+    padding: '6px 16px', fontSize: '11px', color: '#51cf66', textAlign: 'center', flexShrink: 0,
   },
   notificationBanner: {
-    background: 'rgba(81,207,102,0.9)', padding: '10px 24px',
-    fontSize: '14px', color: '#fff', textAlign: 'center', fontWeight: '600',
-    position: 'fixed', top: 0, left: 0, right: 0, zIndex: 1000,
+    background: 'linear-gradient(135deg, #51cf66, #2f9e44)',
+    padding: '10px 16px', fontSize: '13px', color: '#fff',
+    textAlign: 'center', fontWeight: '600',
+    position: 'fixed', top: 0, left: 0, right: 0, zIndex: 1000, cursor: 'pointer',
   },
   infoBar: {
     background: 'rgba(255,255,255,0.03)', borderBottom: '1px solid rgba(255,255,255,0.06)',
-    padding: '8px 24px', display: 'flex', gap: '24px', fontSize: '12px', color: 'rgba(255,255,255,0.4)',
-    overflowX: 'auto',
+    padding: '6px 16px', display: 'flex', gap: '12px', fontSize: '11px',
+    color: 'rgba(255,255,255,0.4)', overflowX: 'auto', flexShrink: 0,
+    WebkitOverflowScrolling: 'touch',
   },
-  onlineCount: { marginLeft: 'auto', color: '#51cf66' },
-  messagesContainer: { flex: 1, overflowY: 'auto', padding: '24px', display: 'flex', flexDirection: 'column', gap: '16px' },
-  emptyState: { display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', flex: 1, gap: '8px', marginTop: '80px' },
-  emptyIcon: { fontSize: '48px', opacity: 0.3 },
-  emptyText: { color: 'rgba(255,255,255,0.3)', fontSize: '18px', margin: 0 },
-  emptySubtext: { color: 'rgba(255,255,255,0.2)', fontSize: '14px', margin: 0 },
-  myMessageWrapper: { display: 'flex', alignItems: 'flex-end', gap: '8px', justifyContent: 'flex-end' },
-  otherMessageWrapper: { display: 'flex', alignItems: 'flex-end', gap: '8px', justifyContent: 'flex-start' },
-  avatar: {
-    width: '32px', height: '32px', borderRadius: '50%',
+  onlineCount: { marginLeft: 'auto', color: '#51cf66', whiteSpace: 'nowrap' },
+  searchContainer: {
+    padding: '10px 16px', borderBottom: '1px solid rgba(255,255,255,0.06)',
+    background: 'rgba(255,255,255,0.02)', flexShrink: 0,
+  },
+  searchInput: {
+    width: '100%', padding: '10px 16px', borderRadius: '12px',
+    border: '1px solid rgba(255,255,255,0.15)', background: 'rgba(255,255,255,0.08)',
+    color: '#fff', fontSize: '15px', outline: 'none',
+  },
+  dmListContainer: { flex: 1, overflowY: 'auto', padding: '12px 16px', WebkitOverflowScrolling: 'touch' },
+  sectionTitle: {
+    color: 'rgba(255,255,255,0.35)', fontSize: '11px', fontWeight: '700',
+    textTransform: 'uppercase', letterSpacing: '1px', margin: '12px 0 8px 0',
+  },
+  noResults: { color: 'rgba(255,255,255,0.3)', fontSize: '14px', textAlign: 'center', padding: '20px 0' },
+  convCard: {
+    display: 'flex', alignItems: 'center', gap: '12px',
+    background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.07)',
+    borderRadius: '16px', padding: '12px 14px', cursor: 'pointer', marginBottom: '8px',
+    touchAction: 'manipulation',
+  },
+  convCardUnread: {
+    background: 'rgba(245,166,35,0.08)', border: '1px solid rgba(245,166,35,0.2)',
+  },
+  convAvatar: {
+    width: '44px', height: '44px', borderRadius: '50%',
     background: 'linear-gradient(135deg, #302b63, #24243e)',
-    border: '2px solid rgba(255,255,255,0.2)', display: 'flex',
+    border: '2px solid rgba(255,255,255,0.15)', display: 'flex',
     alignItems: 'center', justifyContent: 'center', color: '#fff',
-    fontSize: '13px', fontWeight: 'bold', flexShrink: 0, cursor: 'pointer',
+    fontSize: '18px', fontWeight: 'bold', flexShrink: 0,
   },
-  avatarMe: {
-    width: '32px', height: '32px', borderRadius: '50%',
+  convInfo: { flex: 1, minWidth: 0 },
+  convHeader: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '3px' },
+  convName: { color: '#fff', fontSize: '14px', fontWeight: '600' },
+  convTime: { color: 'rgba(255,255,255,0.3)', fontSize: '11px', flexShrink: 0 },
+  convFooter: { display: 'flex', justifyContent: 'space-between', alignItems: 'center' },
+  convLastMsg: {
+    color: 'rgba(255,255,255,0.4)', fontSize: '12px',
+    overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1,
+  },
+  unreadBadge: {
+    background: '#f5a623', color: '#fff', borderRadius: '10px',
+    padding: '2px 7px', fontSize: '11px', fontWeight: 'bold', flexShrink: 0, marginLeft: '8px',
+  },
+  dmStartBtn: {
+    background: 'rgba(81,207,102,0.2)', border: '1px solid rgba(81,207,102,0.3)',
+    borderRadius: '8px', padding: '5px 10px', color: '#51cf66',
+    fontSize: '12px', cursor: 'pointer', flexShrink: 0,
+  },
+  messagesContainer: {
+    flex: 1, overflowY: 'auto', padding: '12px 16px',
+    display: 'flex', flexDirection: 'column', gap: '10px',
+    WebkitOverflowScrolling: 'touch',
+  },
+  emptyState: {
+    display: 'flex', flexDirection: 'column', alignItems: 'center',
+    justifyContent: 'center', flex: 1, gap: '8px', marginTop: '60px',
+  },
+  emptyIcon: { fontSize: '48px', opacity: 0.3 },
+  emptyText: { color: 'rgba(255,255,255,0.3)', fontSize: '16px', margin: 0 },
+  emptySubtext: { color: 'rgba(255,255,255,0.2)', fontSize: '13px', margin: 0 },
+  myMessageWrapper: { display: 'flex', alignItems: 'flex-end', gap: '6px', justifyContent: 'flex-end' },
+  otherMessageWrapper: { display: 'flex', alignItems: 'flex-end', gap: '6px', justifyContent: 'flex-start' },
+  avatarSmall: {
+    width: '28px', height: '28px', borderRadius: '50%',
+    background: 'linear-gradient(135deg, #302b63, #24243e)',
+    border: '2px solid rgba(255,255,255,0.15)', display: 'flex',
+    alignItems: 'center', justifyContent: 'center', color: '#fff',
+    fontSize: '12px', fontWeight: 'bold', flexShrink: 0, cursor: 'pointer',
+  },
+  avatarMeSmall: {
+    width: '28px', height: '28px', borderRadius: '50%',
     background: 'linear-gradient(135deg, #f5a623, #f0532a)',
     display: 'flex', alignItems: 'center', justifyContent: 'center',
-    color: '#fff', fontSize: '13px', fontWeight: 'bold', flexShrink: 0,
+    color: '#fff', fontSize: '12px', fontWeight: 'bold', flexShrink: 0,
   },
-  messageContent: { maxWidth: '65%' },
-  msgUsername: { color: '#f5a623', fontSize: '12px', marginBottom: '4px', fontWeight: '600', cursor: 'pointer' },
-  dmHint: { color: '#51cf66', fontSize: '10px', marginLeft: '6px' },
+  messageContent: { maxWidth: '75%' },
+  msgUsername: { color: '#f5a623', fontSize: '11px', marginBottom: '3px', fontWeight: '600', cursor: 'pointer' },
+  dmHint: { color: '#51cf66', fontSize: '9px', marginLeft: '4px' },
   myBubble: {
     background: 'linear-gradient(135deg, #f5a623, #f0532a)', color: '#fff',
-    padding: '12px 16px', borderRadius: '18px 18px 4px 18px', fontSize: '14px', lineHeight: '1.5',
+    padding: '10px 14px', borderRadius: '18px 18px 4px 18px',
+    fontSize: '14px', lineHeight: '1.5', wordBreak: 'break-word',
   },
   otherBubble: {
     background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.1)',
-    color: '#fff', padding: '12px 16px', borderRadius: '18px 18px 18px 4px',
-    fontSize: '14px', lineHeight: '1.5',
+    color: '#fff', padding: '10px 14px', borderRadius: '18px 18px 18px 4px',
+    fontSize: '14px', lineHeight: '1.5', wordBreak: 'break-word',
   },
-  msgTime: { color: 'rgba(255,255,255,0.25)', fontSize: '11px', marginTop: '4px', textAlign: 'right' },
-  expiryText: { color: '#ff6b6b', fontSize: '10px' },
-  typingIndicator: { color: 'rgba(255,255,255,0.4)', fontSize: '12px', padding: '4px 24px 8px', fontStyle: 'italic' },
+  msgTime: { color: 'rgba(255,255,255,0.25)', fontSize: '10px', marginTop: '3px', textAlign: 'right' },
+  expiryText: { color: '#ff6b6b', fontSize: '9px' },
+  typingIndicator: {
+    color: 'rgba(255,255,255,0.4)', fontSize: '12px',
+    padding: '4px 16px 6px', fontStyle: 'italic', flexShrink: 0,
+  },
   typingDots: { color: '#f5a623' },
   inputContainer: {
-    display: 'flex', gap: '12px', padding: '16px 24px 24px',
-    borderTop: '1px solid rgba(255,255,255,0.08)', background: 'rgba(255,255,255,0.02)',
-    alignItems: 'center',
+    display: 'flex', gap: '8px', padding: '10px 16px 16px',
+    borderTop: '1px solid rgba(255,255,255,0.08)',
+    background: 'rgba(255,255,255,0.02)', alignItems: 'center', flexShrink: 0,
+    paddingBottom: 'max(16px, env(safe-area-inset-bottom))',
   },
   messageInput: {
-    flex: 1, padding: '14px 20px', borderRadius: '25px',
+    flex: 1, padding: '12px 16px', borderRadius: '25px',
     border: '1px solid rgba(255,255,255,0.15)', background: 'rgba(255,255,255,0.08)',
-    color: '#fff', fontSize: '14px', outline: 'none',
+    color: '#fff', fontSize: '15px', outline: 'none',
   },
   attachBtn: {
-    width: '48px', height: '48px', background: 'rgba(255,255,255,0.1)',
+    width: '44px', height: '44px', background: 'rgba(255,255,255,0.1)',
     border: '1px solid rgba(255,255,255,0.2)', borderRadius: '50%',
-    color: '#fff', fontSize: '20px', cursor: 'pointer',
+    color: '#fff', fontSize: '18px', cursor: 'pointer', flexShrink: 0,
     display: 'flex', alignItems: 'center', justifyContent: 'center',
-    flexShrink: 0,
+    touchAction: 'manipulation',
   },
   sendBtn: {
-    width: '48px', height: '48px', background: 'linear-gradient(135deg, #f5a623, #f0532a)',
+    width: '44px', height: '44px', background: 'linear-gradient(135deg, #f5a623, #f0532a)',
     border: 'none', borderRadius: '50%', color: '#fff', fontWeight: 'bold',
-    cursor: 'pointer', fontSize: '18px',
+    cursor: 'pointer', fontSize: '16px', flexShrink: 0, touchAction: 'manipulation',
   },
   sendBtnDisabled: {
-    width: '48px', height: '48px', background: 'rgba(255,255,255,0.1)',
+    width: '44px', height: '44px', background: 'rgba(255,255,255,0.1)',
     border: 'none', borderRadius: '50%', color: 'rgba(255,255,255,0.3)',
-    cursor: 'not-allowed', fontSize: '18px',
+    cursor: 'not-allowed', fontSize: '16px', flexShrink: 0,
   },
-  userCard: {
-    display: 'flex', alignItems: 'center', gap: '16px',
-    background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)',
-    borderRadius: '16px', padding: '16px 20px', cursor: 'pointer',
-  },
-  userCardAvatar: {
-    width: '48px', height: '48px', borderRadius: '50%',
-    background: 'linear-gradient(135deg, #f5a623, #f0532a)',
-    display: 'flex', alignItems: 'center', justifyContent: 'center',
-    color: '#fff', fontSize: '20px', fontWeight: 'bold', flexShrink: 0,
-  },
-  userCardInfo: { flex: 1 },
-  userCardName: { color: '#fff', fontSize: '16px', fontWeight: '600' },
-  userCardSub: { color: 'rgba(255,255,255,0.4)', fontSize: '12px', marginTop: '4px' },
-  dmStartBtn: {
-    background: 'rgba(81,207,102,0.2)', border: '1px solid rgba(81,207,102,0.3)',
-    borderRadius: '8px', padding: '8px 16px', color: '#51cf66',
-    fontSize: '13px', cursor: 'pointer',
-  },
-  mediaImage: {
-    maxWidth: '100%', maxHeight: '300px', borderRadius: '12px',
-    cursor: 'pointer', display: 'block',
-  },
-  mediaVideo: {
-    maxWidth: '100%', maxHeight: '300px', borderRadius: '12px', display: 'block',
-  },
-  mediaAudio: {
-    width: '100%', borderRadius: '12px',
-  },
-  fileLink: {
-    color: '#f5a623', textDecoration: 'none', fontWeight: '600',
-  },
+  mediaImage: { maxWidth: '100%', maxHeight: '250px', borderRadius: '12px', cursor: 'pointer', display: 'block' },
+  mediaVideo: { maxWidth: '100%', maxHeight: '250px', borderRadius: '12px', display: 'block' },
+  mediaAudio: { width: '100%', borderRadius: '12px' },
+  fileLink: { color: '#f5a623', textDecoration: 'none', fontWeight: '600' },
 };
 
 export default App;

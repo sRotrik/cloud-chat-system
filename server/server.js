@@ -51,11 +51,14 @@ mongoose.connect(MONGO)
   .then(() => console.log('✅ MongoDB Connected'))
   .catch(err => console.log('❌ MongoDB Error:', err.message));
 
-// Group message schema with auto-delete after 10 minutes
 const MessageSchema = new mongoose.Schema({
   room: String,
   username: String,
   message: String,
+  fileUrl: String,
+  fileId: String,
+  mimetype: String,
+  originalName: String,
   timestamp: { type: Date, default: Date.now },
   expiresAt: { type: Date, default: () => new Date(Date.now() + 10 * 60 * 1000) }
 });
@@ -63,6 +66,7 @@ MessageSchema.index({ expiresAt: 1 }, { expireAfterSeconds: 0 });
 const Message = mongoose.model('Message', MessageSchema);
 
 const PrivateMessage = require('./models/PrivateMessage');
+const Conversation = require('./models/Conversation');
 
 const onlineUsers = new Map();
 
@@ -107,6 +111,12 @@ io.on('connection', (socket) => {
     const roomId = getRoomId(from, to);
     socket.join(`private_${roomId}`);
     onlineUsers.set(from, socket.id);
+
+    // Mark messages as read
+    await Conversation.findOneAndUpdate(
+      { participants: { $all: [from, to] } },
+      { $set: { [`unreadCount.${from}`]: 0 } }
+    );
 
     const key = getSharedKey(from, to);
     const messages = await PrivateMessage.find({ roomId })
@@ -157,6 +167,19 @@ io.on('connection', (socket) => {
     const msg = new PrivateMessage({ from, to, encryptedMessage, roomId, expiresAt });
     await msg.save();
 
+    // Update or create conversation
+    await Conversation.findOneAndUpdate(
+      { participants: { $all: [from, to] } },
+      {
+        lastMessage: message,
+        lastMessageFrom: from,
+        lastMessageTime: new Date(),
+        $inc: { [`unreadCount.${to}`]: 1 },
+        participants: [from, to],
+      },
+      { upsert: true, new: true }
+    );
+
     io.to(`private_${roomId}`).emit('receive_private', {
       from,
       to,
@@ -167,8 +190,15 @@ io.on('connection', (socket) => {
 
     const receiverSocketId = onlineUsers.get(to);
     if (receiverSocketId) {
-      io.to(receiverSocketId).emit('private_notification', { from });
+      io.to(receiverSocketId).emit('private_notification', { from, message });
     }
+  });
+
+  socket.on('mark_read', async ({ from, to }) => {
+    await Conversation.findOneAndUpdate(
+      { participants: { $all: [from, to] } },
+      { $set: { [`unreadCount.${from}`]: 0 } }
+    );
   });
 
   socket.on('private_typing', ({ from, to }) => {
@@ -178,8 +208,8 @@ io.on('connection', (socket) => {
 
   socket.on('disconnect', () => {
     console.log('User disconnected:', socket.id);
-    onlineUsers.forEach((id, username) => {
-      if (id === socket.id) onlineUsers.delete(username);
+    onlineUsers.forEach((id, uname) => {
+      if (id === socket.id) onlineUsers.delete(uname);
     });
   });
 });
