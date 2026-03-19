@@ -17,12 +17,12 @@ function App() {
   const [connected, setConnected] = useState(false);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
-  // Private chat states
   const [privateUser, setPrivateUser] = useState('');
   const [privateMessages, setPrivateMessages] = useState([]);
   const [privateTyping, setPrivateTyping] = useState('');
   const [privateMessage, setPrivateMessage] = useState('');
-  const [usersList, setUsersList] = useState([]); // eslint-disable-line no-unused-vars
+  const [usersList, setUsersList] = useState([]);
+  const [notification, setNotification] = useState('');
   const socketRef = useRef(null);
   const bottomRef = useRef(null);
   const privateBottomRef = useRef(null);
@@ -101,10 +101,25 @@ function App() {
     if (socketRef.current) socketRef.current.disconnect();
   };
 
+  const fetchUsers = async () => {
+    try {
+      const res = await fetch(`${SERVER}/private/users`);
+      const data = await res.json();
+      setUsersList(data);
+    } catch (err) {
+      console.log('Error fetching users:', err);
+    }
+  };
+
   const joinRoom = () => {
     const socket = io(SERVER, { auth: { token }, reconnection: true });
     socketRef.current = socket;
-    socket.on('connect', () => setConnected(true));
+
+    socket.on('connect', () => {
+      setConnected(true);
+      socket.emit('register_user', username);
+    });
+
     socket.on('disconnect', () => setConnected(false));
     socket.emit('join_room', room);
     socket.on('message_history', (history) => setMessages(history));
@@ -120,23 +135,18 @@ function App() {
       setPrivateTyping(`${user} is typing...`);
       setTimeout(() => setPrivateTyping(''), 2000);
     });
-    setScreen('chat');
-    // Load users list
-    fetchUsers();
-  };
+    socket.on('private_notification', ({ from }) => {
+      setNotification(`🔒 New private message from ${from}!`);
+      setTimeout(() => setNotification(''), 5000);
+    });
 
-  const fetchUsers = async () => {
-    try {
-      const res = await fetch(`${SERVER}/private/users`);
-      const data = await res.json();
-      setUsersList(data);
-    } catch (err) {
-      console.log('Error fetching users:', err);
-    }
+    setScreen('chat');
+    fetchUsers();
   };
 
   const openPrivateChat = (targetUser) => {
     setPrivateUser(targetUser);
+    setPrivateMessages([]);
     if (socketRef.current) {
       socketRef.current.emit('join_private', { from: username, to: targetUser });
     }
@@ -176,7 +186,6 @@ function App() {
     setMessages([]); setScreen('room');
   };
 
-  // LOGIN
   if (screen === 'login') return (
     <div style={styles.authContainer}>
       <div style={styles.authBox}>
@@ -213,7 +222,6 @@ function App() {
     </div>
   );
 
-  // REGISTER
   if (screen === 'register') return (
     <div style={styles.authContainer}>
       <div style={styles.authBox}>
@@ -253,7 +261,6 @@ function App() {
     </div>
   );
 
-  // ROOM SELECT
   if (screen === 'room') return (
     <div style={styles.authContainer}>
       <div style={styles.authBox}>
@@ -277,7 +284,44 @@ function App() {
     </div>
   );
 
-  // PRIVATE CHAT
+  if (screen === 'users') return (
+    <div style={styles.chatContainer}>
+      <div style={styles.header}>
+        <div style={styles.headerLeft}>
+          <span style={styles.headerIcon}>👥</span>
+          <div>
+            <h2 style={styles.headerTitle}>Direct Messages</h2>
+            <p style={styles.headerSub}>End-to-End Encrypted • Auto-deletes in 10 min</p>
+          </div>
+        </div>
+        <div style={styles.headerRight}>
+          <div style={styles.userBadge}>👤 {username}</div>
+          <button style={styles.leaveBtn} onClick={() => setScreen('chat')}>Back</button>
+          <button style={styles.logoutBtn2} onClick={handleLogout}>Logout</button>
+        </div>
+      </div>
+      <div style={styles.messagesContainer}>
+        {usersList.filter(u => u.username !== username).length === 0 && (
+          <div style={styles.emptyState}>
+            <div style={styles.emptyIcon}>👥</div>
+            <p style={styles.emptyText}>No other users yet</p>
+            <p style={styles.emptySubtext}>Users appear here once they register</p>
+          </div>
+        )}
+        {usersList.filter(u => u.username !== username).map((u, i) => (
+          <div key={i} style={styles.userCard} onClick={() => openPrivateChat(u.username)}>
+            <div style={styles.userCardAvatar}>{u.username.charAt(0).toUpperCase()}</div>
+            <div style={styles.userCardInfo}>
+              <div style={styles.userCardName}>{u.username}</div>
+              <div style={styles.userCardSub}>🔒 Click to send encrypted message</div>
+            </div>
+            <button style={styles.dmStartBtn}>💬 DM</button>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+
   if (screen === 'private') return (
     <div style={styles.chatContainer}>
       <div style={styles.header}>
@@ -291,12 +335,12 @@ function App() {
         <div style={styles.headerRight}>
           <div style={styles.encryptedBadge}>🔒 E2E Encrypted</div>
           <div style={styles.userBadge}>👤 {username}</div>
-          <button style={styles.leaveBtn} onClick={() => setScreen('chat')}>Back</button>
+          <button style={styles.leaveBtn} onClick={() => setScreen('users')}>Back</button>
           <button style={styles.logoutBtn2} onClick={handleLogout}>Logout</button>
         </div>
       </div>
       <div style={styles.privateBanner}>
-        🔐 Messages are AES-256 encrypted • 🕐 Auto-deleted after 10 minutes • 👁️ Only you and {privateUser} can read these
+        🔐 AES-256 Encrypted • 🕐 Auto-deleted after 10 minutes • 👁️ Only you and {privateUser} can read these
       </div>
       <div style={styles.messagesContainer}>
         {privateMessages.length === 0 && (
@@ -340,9 +384,11 @@ function App() {
     </div>
   );
 
-  // MAIN CHAT
   return (
     <div style={styles.chatContainer}>
+      {notification && (
+        <div style={styles.notificationBanner}>{notification}</div>
+      )}
       <div style={styles.header}>
         <div style={styles.headerLeft}>
           <span style={styles.headerIcon}>☁️</span>
@@ -357,7 +403,7 @@ function App() {
             <span style={styles.statusText}>{connected ? 'Connected' : 'Disconnected'}</span>
           </div>
           <div style={styles.userBadge}>👤 {username}</div>
-          <button style={styles.privateBtn} onClick={() => setScreen('users')}>💬 DM</button>
+          <button style={styles.privateBtn} onClick={() => { fetchUsers(); setScreen('users'); }}>💬 DM</button>
           <button style={styles.leaveBtn} onClick={leaveRoom}>Leave</button>
           <button style={styles.logoutBtn2} onClick={handleLogout}>Logout</button>
         </div>
@@ -417,8 +463,6 @@ function App() {
       </div>
     </div>
   );
-
-  // USERS LIST screen handled inline above via setScreen('users')
 }
 
 const styles = {
@@ -524,6 +568,11 @@ const styles = {
     background: 'rgba(81,207,102,0.1)', borderBottom: '1px solid rgba(81,207,102,0.2)',
     padding: '8px 24px', fontSize: '12px', color: '#51cf66', textAlign: 'center',
   },
+  notificationBanner: {
+    background: 'rgba(81,207,102,0.9)', padding: '10px 24px',
+    fontSize: '14px', color: '#fff', textAlign: 'center', fontWeight: '600',
+    position: 'fixed', top: 0, left: 0, right: 0, zIndex: 1000,
+  },
   infoBar: {
     background: 'rgba(255,255,255,0.03)', borderBottom: '1px solid rgba(255,255,255,0.06)',
     padding: '8px 24px', display: 'flex', gap: '24px', fontSize: '12px', color: 'rgba(255,255,255,0.4)',
@@ -583,6 +632,25 @@ const styles = {
     width: '48px', height: '48px', background: 'rgba(255,255,255,0.1)',
     border: 'none', borderRadius: '50%', color: 'rgba(255,255,255,0.3)',
     cursor: 'not-allowed', fontSize: '18px',
+  },
+  userCard: {
+    display: 'flex', alignItems: 'center', gap: '16px',
+    background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)',
+    borderRadius: '16px', padding: '16px 20px', cursor: 'pointer',
+  },
+  userCardAvatar: {
+    width: '48px', height: '48px', borderRadius: '50%',
+    background: 'linear-gradient(135deg, #f5a623, #f0532a)',
+    display: 'flex', alignItems: 'center', justifyContent: 'center',
+    color: '#fff', fontSize: '20px', fontWeight: 'bold', flexShrink: 0,
+  },
+  userCardInfo: { flex: 1 },
+  userCardName: { color: '#fff', fontSize: '16px', fontWeight: '600' },
+  userCardSub: { color: 'rgba(255,255,255,0.4)', fontSize: '12px', marginTop: '4px' },
+  dmStartBtn: {
+    background: 'rgba(81,207,102,0.2)', border: '1px solid rgba(81,207,102,0.3)',
+    borderRadius: '8px', padding: '8px 16px', color: '#51cf66',
+    fontSize: '13px', cursor: 'pointer',
   },
 };
 

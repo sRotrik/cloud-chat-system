@@ -22,9 +22,8 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
-// Routes
 const authRoutes = require('./routes/auth');
-const { router: privateRoutes, encryptMessage, getSharedKey, getRoomId } = require('./routes/private');
+const { router: privateRoutes, getSharedKey, getRoomId } = require('./routes/private');
 app.use('/auth', authRoutes);
 app.use('/private', privateRoutes);
 
@@ -33,7 +32,6 @@ const io = new Server(server, {
   cors: { origin: '*', methods: ['GET', 'POST'] }
 });
 
-// Redis
 const pubClient = createClient({
   url: REDIS_URL,
   socket: { tls: true, rejectUnauthorized: false, connectTimeout: 30000 }
@@ -51,7 +49,6 @@ mongoose.connect(MONGO)
   .then(() => console.log('✅ MongoDB Connected'))
   .catch(err => console.log('❌ MongoDB Error:', err.message));
 
-// Models
 const MessageSchema = new mongoose.Schema({
   room: String,
   username: String,
@@ -61,13 +58,16 @@ const MessageSchema = new mongoose.Schema({
 const Message = mongoose.model('Message', MessageSchema);
 const PrivateMessage = require('./models/PrivateMessage');
 
-// Track online users
 const onlineUsers = new Map();
 
 io.on('connection', (socket) => {
   console.log('✅ User connected:', socket.id);
 
-  // Public room chat
+  socket.on('register_user', (username) => {
+    onlineUsers.set(username, socket.id);
+    console.log(`👤 ${username} registered with socket ${socket.id}`);
+  });
+
   socket.on('join_room', async (room) => {
     socket.join(room);
     const history = await Message.find({ room })
@@ -91,13 +91,11 @@ io.on('connection', (socket) => {
     socket.to(data.room).emit('user_typing', data.username);
   });
 
-  // Private chat
   socket.on('join_private', async ({ from, to }) => {
     const roomId = getRoomId(from, to);
     socket.join(`private_${roomId}`);
     onlineUsers.set(from, socket.id);
 
-    // Load history
     const key = getSharedKey(from, to);
     const messages = await PrivateMessage.find({ roomId })
       .sort('timestamp').limit(50);
@@ -135,19 +133,18 @@ io.on('connection', (socket) => {
     const roomId = getRoomId(from, to);
     const key = getSharedKey(from, to);
 
-    // Encrypt
+    socket.join(`private_${roomId}`);
+
     const iv = crypto.randomBytes(16);
     const cipher = crypto.createCipheriv('aes-256-cbc', Buffer.from(key), iv);
     let encrypted = cipher.update(message, 'utf8', 'hex');
     encrypted += cipher.final('hex');
     const encryptedMessage = iv.toString('hex') + ':' + encrypted;
 
-    // Save with 10 min expiry
     const expiresAt = new Date(Date.now() + 10 * 60 * 1000);
     const msg = new PrivateMessage({ from, to, encryptedMessage, roomId, expiresAt });
     await msg.save();
 
-    // Send decrypted to both users
     io.to(`private_${roomId}`).emit('receive_private', {
       from,
       to,
@@ -155,6 +152,11 @@ io.on('connection', (socket) => {
       timestamp: msg.timestamp,
       expiresAt,
     });
+
+    const receiverSocketId = onlineUsers.get(to);
+    if (receiverSocketId) {
+      io.to(receiverSocketId).emit('private_notification', { from });
+    }
   });
 
   socket.on('private_typing', ({ from, to }) => {
