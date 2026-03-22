@@ -155,6 +155,12 @@ function App() {
       setTyping(`${user} is typing...`);
       setTimeout(() => setTyping(''), 2000);
     });
+    socket.on('messages_expiry_updated', ({ newExpiry }) => {
+      setPrivateMessages(prev => prev.map(m => ({
+        ...m,
+        expiresAt: newExpiry,
+      })));
+    });
     socket.on('private_history', (history) => setPrivateMessages(history));
     socket.on('receive_private', (msg) => {
       setPrivateMessages(prev => {
@@ -165,6 +171,15 @@ function App() {
         return [...prev, msg];
       });
       fetchConversations(uname);
+      // If currently viewing this chat, mark as read immediately
+      if (msg.from !== uname) {
+        setPrivateUser(current => {
+          if (current === msg.from) {
+            socket.emit('mark_read', { from: uname, to: msg.from });
+          }
+          return current;
+        });
+      }
     });
     socket.on('private_user_typing', (user) => {
       setPrivateTyping(`${user} is typing...`);
@@ -194,10 +209,13 @@ function App() {
     setPrivateUser(targetUser);
     setPrivateMessages([]);
     socket.emit('join_private', { from: username, to: targetUser });
-    socket.emit('mark_read', { from: username, to: targetUser });
+    // Mark read AFTER joining - this starts the 5 min countdown
+    setTimeout(() => {
+      socket.emit('mark_read', { from: username, to: targetUser });
+      fetchConversations(username);
+    }, 500);
     setSearchQuery(''); setSearchResults([]);
     setScreen('private');
-    setTimeout(() => fetchConversations(username), 500);
   };
 
   const sendMessage = () => {

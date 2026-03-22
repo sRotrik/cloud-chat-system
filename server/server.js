@@ -77,6 +77,8 @@ io.on('connection', (socket) => {
     onlineUsers.set(username, socket.id);
     console.log(`👤 ${username} registered with socket ${socket.id}`);
     io.emit('online_users_list', Array.from(onlineUsers.keys()));
+    // Send current online list to this specific user
+    socket.emit('online_users_list', Array.from(onlineUsers.keys()));
   });
 
   socket.on('join_room', async (room) => {
@@ -187,10 +189,26 @@ io.on('connection', (socket) => {
   });
 
   socket.on('mark_read', async ({ from, to }) => {
+    const roomId = getRoomId(from, to);
+    const readTime = new Date();
+    const newExpiry = new Date(readTime.getTime() + 5 * 60 * 1000);
+
+    // Reset unread count
     await Conversation.findOneAndUpdate(
       { participants: { $all: [from, to] } },
       { $set: { [`unreadCount.${from}`]: 0 } }
     );
+
+    // Update expiry of all unread messages from this conversation
+    await PrivateMessage.updateMany(
+      { roomId, to: from },
+      { $set: { expiresAt: newExpiry } }
+    );
+
+    // Notify both users of updated expiry
+    io.to(`private_${roomId}`).emit('messages_expiry_updated', {
+      roomId, newExpiry
+    });
   });
 
   socket.on('private_typing', ({ from, to }) => {
