@@ -65,6 +65,12 @@ function App() {
   }, []);
 
   useEffect(() => {
+    if (username && 'Notification' in window && Notification.permission === 'default') {
+      Notification.requestPermission();
+    }
+  }, [username]);
+
+  useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
@@ -137,6 +143,20 @@ function App() {
     } catch (err) { console.log('Search error:', err); }
   };
 
+  const sendBrowserNotification = (title, body) => {
+    if ('Notification' in window) {
+      if (Notification.permission === 'granted') {
+        new Notification(title, { body, icon: '/favicon.ico' });
+      } else if (Notification.permission !== 'denied') {
+        Notification.requestPermission().then(permission => {
+          if (permission === 'granted') {
+            new Notification(title, { body, icon: '/favicon.ico' });
+          }
+        });
+      }
+    }
+  };
+
   const initSocket = (uname) => {
     if (socketRef.current?.connected) return socketRef.current;
     const socket = io(SERVER, { auth: { token }, reconnection: true });
@@ -155,12 +175,6 @@ function App() {
       setTyping(`${user} is typing...`);
       setTimeout(() => setTyping(''), 2000);
     });
-    socket.on('messages_expiry_updated', ({ newExpiry }) => {
-      setPrivateMessages(prev => prev.map(m => ({
-        ...m,
-        expiresAt: newExpiry,
-      })));
-    });
     socket.on('private_history', (history) => setPrivateMessages(history));
     socket.on('receive_private', (msg) => {
       setPrivateMessages(prev => {
@@ -171,24 +185,21 @@ function App() {
         return [...prev, msg];
       });
       fetchConversations(uname);
-      // If currently viewing this chat, mark as read immediately
-      if (msg.from !== uname) {
-        setPrivateUser(current => {
-          if (current === msg.from) {
-            socket.emit('mark_read', { from: uname, to: msg.from });
-          }
-          return current;
-        });
-      }
     });
     socket.on('private_user_typing', (user) => {
       setPrivateTyping(`${user} is typing...`);
       setTimeout(() => setPrivateTyping(''), 2000);
     });
-    socket.on('private_notification', ({ from, message: notifMsg }) => {
-      setNotification(`🔒 ${from}: ${notifMsg?.substring(0, 30)}`);
-      setTimeout(() => setNotification(''), 5000);
+    socket.on('private_notification', ({ from }) => {
+      // In-app banner
+      setNotification(`💬 New message from ${from}`);
+      setTimeout(() => setNotification(''), 6000);
       fetchConversations(uname);
+      // Browser notification
+      sendBrowserNotification('CloudChat 🔒', `New encrypted message from ${from}`);
+    });
+    socket.on('messages_expiry_updated', ({ newExpiry }) => {
+      setPrivateMessages(prev => prev.map(m => ({ ...m, expiresAt: newExpiry })));
     });
 
     const cleanupInterval = setInterval(() => cleanupConversations(uname), 30000);
@@ -209,13 +220,10 @@ function App() {
     setPrivateUser(targetUser);
     setPrivateMessages([]);
     socket.emit('join_private', { from: username, to: targetUser });
-    // Mark read AFTER joining - this starts the 5 min countdown
-    setTimeout(() => {
-      socket.emit('mark_read', { from: username, to: targetUser });
-      fetchConversations(username);
-    }, 500);
+    socket.emit('mark_read', { from: username, to: targetUser });
     setSearchQuery(''); setSearchResults([]);
     setScreen('private');
+    setTimeout(() => fetchConversations(username), 500);
   };
 
   const sendMessage = () => {
@@ -265,7 +273,6 @@ function App() {
       const data = await res.json();
       if (data.error) { alert(data.error); return; }
       if (isPrivate) {
-        // Optimistic update for media
         const tempMsg = {
           from: username, to: privateUser,
           message: `📎 ${data.originalName}`,
@@ -388,7 +395,8 @@ function App() {
         <div style={styles.homeCard} onClick={() => { fetchConversations(username); initSocket(username); setScreen('users'); }}>
           <div style={{...styles.homeCardIcon, background: 'linear-gradient(135deg, #51cf66, #2f9e44)'}}>🔐</div>
           <div style={styles.homeCardInfo}>
-            <div style={styles.homeCardTitle}>Private Messages
+            <div style={styles.homeCardTitle}>
+              Private Messages
               {totalUnread > 0 && <span style={styles.homeBadge}>{totalUnread}</span>}
             </div>
             <div style={styles.homeCardSub}>E2E Encrypted • Auto-delete 5min • Media sharing</div>
@@ -452,10 +460,14 @@ function App() {
                 </div>
                 <div style={styles.convInfo}>
                   <div style={styles.convHeader}>
-                    <span style={styles.convName}>{u.username}</span>
-                    <span style={{...styles.onlineStatusText, color: isOnline(u.username) ? '#51cf66' : '#888'}}>{isOnline(u.username) ? '● Online' : '○ Offline'}</span>
+                    <div style={{display:'flex', alignItems:'center', gap:'6px'}}>
+                      <span style={styles.convName}>{u.username}</span>
+                      <span style={{fontSize:'9px', color: isOnline(u.username) ? '#51cf66' : '#666'}}>
+                        {isOnline(u.username) ? '● online' : '○ offline'}
+                      </span>
+                    </div>
                   </div>
-                  <div style={styles.convLastMsg}>🔒 Start encrypted chat</div>
+                  <div style={styles.convLastMsg}>🔒 Tap to start encrypted chat</div>
                 </div>
                 <span style={styles.dmStartBtn}>DM</span>
               </div>
@@ -476,20 +488,31 @@ function App() {
                   const other = getOtherParticipant(conv);
                   const unread = getUnreadCount(conv);
                   return (
-                    <div key={i} style={{...styles.convCard, ...(unread > 0 ? styles.convCardUnread : {})}} onClick={() => openPrivateChat(other)}>
+                    <div key={i} style={{...styles.convCard, ...(unread > 0 ? styles.convCardUnread : {})}}
+                      onClick={() => openPrivateChat(other)}>
                       <div style={{...styles.convAvatar, position: 'relative'}}>
                         {other.charAt(0).toUpperCase()}<OnlineDot isOnline={isOnline(other)} />
                       </div>
                       <div style={styles.convInfo}>
                         <div style={styles.convHeader}>
-                          <span style={styles.convName}>{other}</span>
+                          <div style={{display:'flex', alignItems:'center', gap:'6px'}}>
+                            <span style={{...styles.convName, fontWeight: unread > 0 ? '800' : '600'}}>{other}</span>
+                            <span style={{fontSize:'9px', color: isOnline(other) ? '#51cf66' : '#666'}}>
+                              {isOnline(other) ? '● online' : '○ offline'}
+                            </span>
+                          </div>
                           <span style={styles.convTime}>{formatTime(conv.lastMessageTime)}</span>
                         </div>
                         <div style={styles.convFooter}>
-                          <span style={styles.convLastMsg}>
-                            {conv.lastMessageFrom === username ? '✓ You: ' : ''}
-                            {conv.lastMessage?.substring(0, 30)}{conv.lastMessage?.length > 30 ? '...' : ''}
-                          </span>
+                          {unread > 0 ? (
+                            <span style={{...styles.convLastMsg, color: '#51cf66', fontWeight: '600'}}>
+                              🔒 {unread} new message{unread > 1 ? 's' : ''}
+                            </span>
+                          ) : conv.lastMessageFrom === username ? (
+                            <span style={styles.convLastMsg}>✓ You sent a message</span>
+                          ) : (
+                            <span style={styles.convLastMsg}>🔒 Encrypted message</span>
+                          )}
                           {unread > 0 && <span style={styles.unreadBadge}>{unread}</span>}
                         </div>
                       </div>
@@ -517,7 +540,9 @@ function App() {
           <div>
             <h2 style={styles.headerTitle}>{privateUser}</h2>
             <p style={styles.headerSub}>
-              <span style={{color: isOnline(privateUser) ? '#51cf66' : '#888'}}>{isOnline(privateUser) ? '● Online' : '○ Offline'}</span>
+              <span style={{color: isOnline(privateUser) ? '#51cf66' : '#888'}}>
+                {isOnline(privateUser) ? '● Online' : '○ Offline'}
+              </span>
               {' • '}🔒 E2E • 5min delete
             </p>
           </div>
@@ -526,13 +551,13 @@ function App() {
           <button style={styles.logoutBtn2} onClick={handleLogout}>⏻</button>
         </div>
       </div>
-      <div style={styles.privateBanner}>🔐 AES-256 • 🕐 5min auto-delete • 👁️ Only you & {privateUser}</div>
+      <div style={styles.privateBanner}>🔐 AES-256 • 🕐 5min auto-delete after reading • 👁️ Only you & {privateUser}</div>
       <div style={styles.messagesContainer}>
         {privateMessages.length === 0 && (
           <div style={styles.emptyState}>
             <div style={styles.emptyIcon}>🔐</div>
             <p style={styles.emptyText}>Encrypted Chat</p>
-            <p style={styles.emptySubtext}>Messages & media delete after 5 minutes</p>
+            <p style={styles.emptySubtext}>5min countdown starts when recipient reads</p>
           </div>
         )}
         {privateMessages.map((m, i) => (
@@ -544,7 +569,7 @@ function App() {
                 {m.fileUrl ? renderMedia(m) : `🔒 ${m.message}`}
               </div>
               <div style={styles.msgTime}>
-                {m.temp ? 'sending...' : new Date(m.timestamp).toLocaleTimeString()}
+                {m.temp ? '⏳ sending...' : new Date(m.timestamp).toLocaleTimeString()}
                 {m.expiresAt && !m.temp && <span style={styles.expiryText}> • 🔥 {new Date(m.expiresAt).toLocaleTimeString()}</span>}
               </div>
             </div>
