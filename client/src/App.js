@@ -198,6 +198,9 @@ function App() {
       // Browser notification
       sendBrowserNotification('CloudChat 🔒', `New encrypted message from ${from}`);
     });
+    socket.on('refresh_conversations', () => {
+      fetchConversations(uname);
+    });
     socket.on('messages_expiry_updated', ({ newExpiry }) => {
       setPrivateMessages(prev => prev.map(m => ({ ...m, expiresAt: newExpiry })));
     });

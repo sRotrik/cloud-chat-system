@@ -171,17 +171,32 @@ io.on('connection', (socket) => {
         const msg = new PrivateMessage({ from, to, encryptedMessage, roomId, expiresAt, fileUrl, mimetype, originalName });
         await msg.save();
 
-        await Conversation.findOneAndUpdate(
-          { participants: { $all: [from, to] } },
-          {
+        // Find existing or create new conversation
+        let conv = await Conversation.findOne({ participants: { $all: [from, to] } });
+        if (!conv) {
+          conv = new Conversation({
+            participants: [from, to],
             lastMessage: message,
             lastMessageFrom: from,
             lastMessageTime: timestamp,
-            $inc: { [`unreadCount.${to}`]: 1 },
-            participants: [from, to],
-          },
-          { upsert: true, new: true }
-        );
+            unreadCount: { [to]: 1, [from]: 0 },
+          });
+          await conv.save();
+        } else {
+          conv.lastMessage = message;
+          conv.lastMessageFrom = from;
+          conv.lastMessageTime = timestamp;
+          conv.unreadCount = conv.unreadCount || {};
+          conv.unreadCount[to] = (conv.unreadCount[to] || 0) + 1;
+          conv.markModified('unreadCount');
+          await conv.save();
+        }
+
+        // Notify receiver to refresh their conversation list
+        const receiverSockId = onlineUsers.get(to);
+        if (receiverSockId) {
+          io.to(receiverSockId).emit('refresh_conversations');
+        }
       } catch (err) {
         console.log('Background save error:', err.message);
       }
