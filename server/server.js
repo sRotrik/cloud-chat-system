@@ -138,7 +138,7 @@ io.on('connection', (socket) => {
     socket.emit('private_history', decrypted);
   });
 
-  socket.on('send_private', async ({ from, to, message }) => {
+  socket.on('send_private', async ({ from, to, message, fileUrl, mimetype, originalName }) => {
     const roomId = getRoomId(from, to);
     const key = getSharedKey(from, to);
     const timestamp = new Date();
@@ -149,8 +149,8 @@ io.on('connection', (socket) => {
     // ⚡ Broadcast INSTANTLY
     io.to(`private_${roomId}`).emit('receive_private', {
       from, to, message, timestamp, expiresAt,
+      fileUrl, mimetype, originalName,
     });
-
     // Notify receiver instantly
     const receiverSocketId = onlineUsers.get(to);
     if (receiverSocketId) {
