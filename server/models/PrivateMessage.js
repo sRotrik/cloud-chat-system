@@ -5,6 +5,9 @@ const PrivateMessageSchema = new mongoose.Schema({
   to: { type: String, required: true },
   encryptedMessage: { type: String, required: true },
   roomId: { type: String, required: true },
+  fileUrl: { type: String },
+  mimetype: { type: String },
+  originalName: { type: String },
   timestamp: { type: Date, default: Date.now },
   expiresAt: { type: Date, required: true },
 });

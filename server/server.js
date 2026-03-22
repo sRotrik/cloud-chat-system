@@ -129,7 +129,7 @@ io.on('connection', (socket) => {
         const decipher = crypto.createDecipheriv('aes-256-cbc', Buffer.from(key), iv);
         let text = decipher.update(encrypted, 'hex', 'utf8');
         text += decipher.final('utf8');
-        return { from: msg.from, to: msg.to, message: text, timestamp: msg.timestamp, expiresAt: msg.expiresAt };
+        return { from: msg.from, to: msg.to, message: text, timestamp: msg.timestamp, expiresAt: msg.expiresAt, fileUrl: msg.fileUrl, mimetype: msg.mimetype, originalName: msg.originalName };
       } catch {
         return { from: msg.from, to: msg.to, message: '[Encrypted]', timestamp: msg.timestamp };
       }
@@ -166,7 +166,7 @@ io.on('connection', (socket) => {
         encrypted += cipher.final('hex');
         const encryptedMessage = iv.toString('hex') + ':' + encrypted;
 
-        const msg = new PrivateMessage({ from, to, encryptedMessage, roomId, expiresAt });
+        const msg = new PrivateMessage({ from, to, encryptedMessage, roomId, expiresAt, fileUrl, mimetype, originalName });
         await msg.save();
 
         await Conversation.findOneAndUpdate(
