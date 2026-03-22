@@ -109,7 +109,7 @@ function App() {
   const handleLogout = () => {
     localStorage.removeItem('token'); localStorage.removeItem('username');
     setToken(''); setUsername(''); setMessages([]); setScreen('login');
-    if (socketRef.current) socketRef.current.disconnect();
+    if (socketRef.current) { socketRef.current.disconnect(); socketRef.current = null; }
   };
 
   const fetchConversations = async (uname) => {
@@ -141,13 +141,20 @@ function App() {
     if (socketRef.current?.connected) return socketRef.current;
     const socket = io(SERVER, { auth: { token }, reconnection: true });
     socketRef.current = socket;
-    socket.on('connect', () => { setConnected(true); socket.emit('register_user', uname); });
+
+    socket.on('connect', () => {
+      setConnected(true);
+      socket.emit('register_user', uname);
+    });
     socket.on('disconnect', () => setConnected(false));
     socket.on('online_count', (count) => setOnlineUsers(count));
     socket.on('online_users_list', (list) => setOnlineUsersList(list));
     socket.on('message_history', (history) => setMessages(history));
     socket.on('receive_message', (msg) => setMessages(prev => [...prev, msg]));
-    socket.on('user_typing', (user) => { setTyping(`${user} is typing...`); setTimeout(() => setTyping(''), 2000); });
+    socket.on('user_typing', (user) => {
+      setTyping(`${user} is typing...`);
+      setTimeout(() => setTyping(''), 2000);
+    });
     socket.on('private_history', (history) => setPrivateMessages(history));
     socket.on('receive_private', (msg) => {
       setPrivateMessages(prev => {
@@ -159,14 +166,19 @@ function App() {
       });
       fetchConversations(uname);
     });
-    socket.on('private_user_typing', (user) => { setPrivateTyping(`${user} is typing...`); setTimeout(() => setPrivateTyping(''), 2000); });
+    socket.on('private_user_typing', (user) => {
+      setPrivateTyping(`${user} is typing...`);
+      setTimeout(() => setPrivateTyping(''), 2000);
+    });
     socket.on('private_notification', ({ from, message: notifMsg }) => {
       setNotification(`🔒 ${from}: ${notifMsg?.substring(0, 30)}`);
       setTimeout(() => setNotification(''), 5000);
       fetchConversations(uname);
     });
-    const cleanupInterval = setInterval(() => cleanupConversations(uname), 60000);
+
+    const cleanupInterval = setInterval(() => cleanupConversations(uname), 30000);
     socket.on('disconnect', () => clearInterval(cleanupInterval));
+
     return socket;
   };
 
@@ -198,19 +210,16 @@ function App() {
   const sendPrivateMessage = () => {
     if (privateMessage.trim() && socketRef.current) {
       const msgText = privateMessage;
-      // Optimistic update - show instantly
       const tempMsg = {
-        from: username,
-        to: privateUser,
-        message: msgText,
+        from: username, to: privateUser, message: msgText,
         timestamp: new Date(),
-        expiresAt: new Date(Date.now() + 10 * 60 * 1000),
+        expiresAt: new Date(Date.now() + 5 * 60 * 1000),
         temp: true,
       };
       setPrivateMessages(prev => [...prev, tempMsg]);
       setPrivateMessage('');
       socketRef.current.emit('send_private', { from: username, to: privateUser, message: msgText });
-      setTimeout(() => fetchConversations(username), 500);
+      setTimeout(() => fetchConversations(username), 1000);
     }
   };
 
@@ -238,6 +247,18 @@ function App() {
       const data = await res.json();
       if (data.error) { alert(data.error); return; }
       if (isPrivate) {
+        // Optimistic update for media
+        const tempMsg = {
+          from: username, to: privateUser,
+          message: `📎 ${data.originalName}`,
+          fileUrl: `${SERVER}/media/file/${data.fileId}`,
+          mimetype: data.mimetype,
+          originalName: data.originalName,
+          timestamp: new Date(),
+          expiresAt: new Date(Date.now() + 5 * 60 * 1000),
+          temp: true,
+        };
+        setPrivateMessages(prev => [...prev, tempMsg]);
         socketRef.current.emit('send_private', {
           from: username, to: privateUser,
           message: `📎 ${data.originalName}`,
@@ -263,8 +284,7 @@ function App() {
   };
 
   const leaveRoom = () => {
-    if (socketRef.current) socketRef.current.disconnect();
-    socketRef.current = null;
+    if (socketRef.current) { socketRef.current.disconnect(); socketRef.current = null; }
     setMessages([]); setScreen('home');
   };
 
@@ -339,29 +359,24 @@ function App() {
       <div style={{...styles.authBox, maxWidth: '480px'}}>
         <div style={styles.logoContainer}><span style={styles.logoIcon}>☁️</span><h1 style={styles.logo}>CloudChat</h1></div>
         <p style={styles.subtitle}>Welcome back, <strong style={{color:'#f5a623'}}>{username}</strong>!</p>
-
-        {/* Group Chat Card */}
         <div style={styles.homeCard} onClick={() => setScreen('roomSelect')}>
           <div style={styles.homeCardIcon}>💬</div>
           <div style={styles.homeCardInfo}>
             <div style={styles.homeCardTitle}>Group Chat</div>
-            <div style={styles.homeCardSub}>Join public rooms • Real-time • Auto-delete 10min</div>
+            <div style={styles.homeCardSub}>Join public rooms • Real-time • Auto-delete 5min • Media sharing</div>
           </div>
           <span style={styles.homeCardArrow}>→</span>
         </div>
-
-        {/* Private Chat Card */}
         <div style={styles.homeCard} onClick={() => { fetchConversations(username); initSocket(username); setScreen('users'); }}>
           <div style={{...styles.homeCardIcon, background: 'linear-gradient(135deg, #51cf66, #2f9e44)'}}>🔐</div>
           <div style={styles.homeCardInfo}>
             <div style={styles.homeCardTitle}>Private Messages
               {totalUnread > 0 && <span style={styles.homeBadge}>{totalUnread}</span>}
             </div>
-            <div style={styles.homeCardSub}>E2E Encrypted • Auto-delete 10min • Media sharing</div>
+            <div style={styles.homeCardSub}>E2E Encrypted • Auto-delete 5min • Media sharing</div>
           </div>
           <span style={styles.homeCardArrow}>→</span>
         </div>
-
         <button style={styles.logoutBtn} onClick={handleLogout}>Sign Out</button>
       </div>
     </div>
@@ -485,7 +500,7 @@ function App() {
             <h2 style={styles.headerTitle}>{privateUser}</h2>
             <p style={styles.headerSub}>
               <span style={{color: isOnline(privateUser) ? '#51cf66' : '#888'}}>{isOnline(privateUser) ? '● Online' : '○ Offline'}</span>
-              {' • '}🔒 E2E • 10min delete
+              {' • '}🔒 E2E • 5min delete
             </p>
           </div>
         </div>
@@ -493,13 +508,13 @@ function App() {
           <button style={styles.logoutBtn2} onClick={handleLogout}>⏻</button>
         </div>
       </div>
-      <div style={styles.privateBanner}>🔐 AES-256 • 🕐 10min auto-delete • 👁️ Only you & {privateUser}</div>
+      <div style={styles.privateBanner}>🔐 AES-256 • 🕐 5min auto-delete • 👁️ Only you & {privateUser}</div>
       <div style={styles.messagesContainer}>
         {privateMessages.length === 0 && (
           <div style={styles.emptyState}>
             <div style={styles.emptyIcon}>🔐</div>
             <p style={styles.emptyText}>Encrypted Chat</p>
-            <p style={styles.emptySubtext}>Messages & media delete after 10 minutes</p>
+            <p style={styles.emptySubtext}>Messages & media delete after 5 minutes</p>
           </div>
         )}
         {privateMessages.map((m, i) => (
@@ -507,12 +522,12 @@ function App() {
             {m.from !== username && <div style={styles.avatarSmall}>{m.from.charAt(0).toUpperCase()}</div>}
             <div style={styles.messageContent}>
               {m.from !== username && <div style={styles.msgUsername}>{m.from}</div>}
-              <div style={m.from === username ? styles.myBubble : styles.otherBubble}>
+              <div style={{...(m.from === username ? styles.myBubble : styles.otherBubble), opacity: m.temp ? 0.7 : 1}}>
                 {m.fileUrl ? renderMedia(m) : `🔒 ${m.message}`}
               </div>
               <div style={styles.msgTime}>
-                {new Date(m.timestamp).toLocaleTimeString()}
-                {m.expiresAt && <span style={styles.expiryText}> • 🔥 {new Date(m.expiresAt).toLocaleTimeString()}</span>}
+                {m.temp ? 'sending...' : new Date(m.timestamp).toLocaleTimeString()}
+                {m.expiresAt && !m.temp && <span style={styles.expiryText}> • 🔥 {new Date(m.expiresAt).toLocaleTimeString()}</span>}
               </div>
             </div>
             {m.from === username && <div style={styles.avatarMeSmall}>{username.charAt(0).toUpperCase()}</div>}
@@ -663,7 +678,7 @@ const styles = {
   primaryBtn: {
     padding: '16px', background: 'linear-gradient(135deg, #f5a623, #f0532a)',
     border: 'none', borderRadius: '12px', color: '#fff', fontSize: '16px',
-    fontWeight: 'bold', cursor: 'pointer', width: '100%', touchAction: 'manipulation',
+    fontWeight: 'bold', cursor: 'pointer', width: '100%',
   },
   googleBtn: {
     padding: '14px', background: 'rgba(255,255,255,0.1)',
@@ -688,7 +703,6 @@ const styles = {
     display: 'flex', alignItems: 'center', gap: '16px',
     background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)',
     borderRadius: '16px', padding: '18px 20px', cursor: 'pointer',
-    touchAction: 'manipulation', transition: 'all 0.2s',
   },
   homeCardIcon: {
     width: '52px', height: '52px', borderRadius: '14px', flexShrink: 0,
@@ -696,10 +710,7 @@ const styles = {
     display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '24px',
   },
   homeCardInfo: { flex: 1 },
-  homeCardTitle: {
-    color: '#fff', fontSize: '16px', fontWeight: '700',
-    display: 'flex', alignItems: 'center', gap: '8px',
-  },
+  homeCardTitle: { color: '#fff', fontSize: '16px', fontWeight: '700', display: 'flex', alignItems: 'center', gap: '8px' },
   homeCardSub: { color: 'rgba(255,255,255,0.4)', fontSize: '12px', marginTop: '4px' },
   homeCardArrow: { color: 'rgba(255,255,255,0.3)', fontSize: '20px' },
   homeBadge: {
@@ -729,7 +740,7 @@ const styles = {
   },
   backBtn: {
     background: 'transparent', border: 'none', color: '#f5a623',
-    fontSize: '20px', cursor: 'pointer', padding: '4px 8px', touchAction: 'manipulation',
+    fontSize: '20px', cursor: 'pointer', padding: '4px 8px',
   },
   privateBtn: {
     background: 'rgba(81,207,102,0.2)', border: '1px solid rgba(81,207,102,0.3)',

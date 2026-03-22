@@ -60,7 +60,7 @@ const MessageSchema = new mongoose.Schema({
   mimetype: String,
   originalName: String,
   timestamp: { type: Date, default: Date.now },
-  expiresAt: { type: Date, default: () => new Date(Date.now() + 10 * 60 * 1000) }
+  expiresAt: { type: Date, default: () => new Date(Date.now() + 5 * 60 * 1000) }
 });
 MessageSchema.index({ expiresAt: 1 }, { expireAfterSeconds: 0 });
 const Message = mongoose.model('Message', MessageSchema);
@@ -89,7 +89,7 @@ io.on('connection', (socket) => {
   });
 
   socket.on('send_message', async (data) => {
-    const expiresAt = new Date(Date.now() + 10 * 60 * 1000);
+    const expiresAt = new Date(Date.now() + 5 * 60 * 1000);
     const msg = new Message({ ...data, expiresAt });
     await msg.save();
     io.to(data.room).emit('receive_message', {
@@ -113,7 +113,6 @@ io.on('connection', (socket) => {
     socket.join(`private_${roomId}`);
     onlineUsers.set(from, socket.id);
 
-    // Mark messages as read
     await Conversation.findOneAndUpdate(
       { participants: { $all: [from, to] } },
       { $set: { [`unreadCount.${from}`]: 0 } }
@@ -127,25 +126,12 @@ io.on('connection', (socket) => {
       try {
         const [ivHex, encrypted] = msg.encryptedMessage.split(':');
         const iv = Buffer.from(ivHex, 'hex');
-        const decipher = crypto.createDecipheriv(
-          'aes-256-cbc', Buffer.from(key), iv
-        );
+        const decipher = crypto.createDecipheriv('aes-256-cbc', Buffer.from(key), iv);
         let text = decipher.update(encrypted, 'hex', 'utf8');
         text += decipher.final('utf8');
-        return {
-          from: msg.from,
-          to: msg.to,
-          message: text,
-          timestamp: msg.timestamp,
-          expiresAt: msg.expiresAt,
-        };
+        return { from: msg.from, to: msg.to, message: text, timestamp: msg.timestamp, expiresAt: msg.expiresAt };
       } catch {
-        return {
-          from: msg.from,
-          to: msg.to,
-          message: '[Encrypted]',
-          timestamp: msg.timestamp,
-        };
+        return { from: msg.from, to: msg.to, message: '[Encrypted]', timestamp: msg.timestamp };
       }
     });
 
@@ -155,44 +141,49 @@ io.on('connection', (socket) => {
   socket.on('send_private', async ({ from, to, message }) => {
     const roomId = getRoomId(from, to);
     const key = getSharedKey(from, to);
+    const timestamp = new Date();
+    const expiresAt = new Date(Date.now() + 5 * 60 * 1000);
 
     socket.join(`private_${roomId}`);
 
-    const iv = crypto.randomBytes(16);
-    const cipher = crypto.createCipheriv('aes-256-cbc', Buffer.from(key), iv);
-    let encrypted = cipher.update(message, 'utf8', 'hex');
-    encrypted += cipher.final('hex');
-    const encryptedMessage = iv.toString('hex') + ':' + encrypted;
-
-    const expiresAt = new Date(Date.now() + 10 * 60 * 1000);
-    const msg = new PrivateMessage({ from, to, encryptedMessage, roomId, expiresAt });
-    await msg.save();
-
-    // Update or create conversation
-    await Conversation.findOneAndUpdate(
-      { participants: { $all: [from, to] } },
-      {
-        lastMessage: message,
-        lastMessageFrom: from,
-        lastMessageTime: new Date(),
-        $inc: { [`unreadCount.${to}`]: 1 },
-        participants: [from, to],
-      },
-      { upsert: true, new: true }
-    );
-
+    // ⚡ Broadcast INSTANTLY
     io.to(`private_${roomId}`).emit('receive_private', {
-      from,
-      to,
-      message,
-      timestamp: msg.timestamp,
-      expiresAt,
+      from, to, message, timestamp, expiresAt,
     });
 
+    // Notify receiver instantly
     const receiverSocketId = onlineUsers.get(to);
     if (receiverSocketId) {
       io.to(receiverSocketId).emit('private_notification', { from, message });
     }
+
+    // Save to DB in background
+    setImmediate(async () => {
+      try {
+        const iv = crypto.randomBytes(16);
+        const cipher = crypto.createCipheriv('aes-256-cbc', Buffer.from(key), iv);
+        let encrypted = cipher.update(message, 'utf8', 'hex');
+        encrypted += cipher.final('hex');
+        const encryptedMessage = iv.toString('hex') + ':' + encrypted;
+
+        const msg = new PrivateMessage({ from, to, encryptedMessage, roomId, expiresAt });
+        await msg.save();
+
+        await Conversation.findOneAndUpdate(
+          { participants: { $all: [from, to] } },
+          {
+            lastMessage: message,
+            lastMessageFrom: from,
+            lastMessageTime: timestamp,
+            $inc: { [`unreadCount.${to}`]: 1 },
+            participants: [from, to],
+          },
+          { upsert: true, new: true }
+        );
+      } catch (err) {
+        console.log('Background save error:', err.message);
+      }
+    });
   });
 
   socket.on('mark_read', async ({ from, to }) => {
@@ -217,10 +208,7 @@ io.on('connection', (socket) => {
 });
 
 app.get('/health', (req, res) => res.json({
-  status: 'OK',
-  timestamp: new Date(),
-  service: 'CloudChat API'
+  status: 'OK', timestamp: new Date(), service: 'CloudChat API'
 }));
 
-server.listen(PORT, () =>
-  console.log('🚀 Server running on port', PORT));
+server.listen(PORT, () => console.log('🚀 Server running on port', PORT));

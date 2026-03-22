@@ -9,7 +9,6 @@ const PrivateMessageSchema = new mongoose.Schema({
   expiresAt: { type: Date, required: true },
 });
 
-// Auto-delete after expiry using MongoDB TTL index
 PrivateMessageSchema.index({ expiresAt: 1 }, { expireAfterSeconds: 0 });
 
 module.exports = mongoose.model('PrivateMessage', PrivateMessageSchema);
