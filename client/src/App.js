@@ -31,7 +31,6 @@ function App() {
   const [privateMessages, setPrivateMessages] = useState([]);
   const [privateTyping, setPrivateTyping] = useState('');
   const [privateMessage, setPrivateMessage] = useState('');
-  const [usersList, setUsersList] = useState([]);
   const [conversations, setConversations] = useState([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState([]);
@@ -116,20 +115,19 @@ function App() {
     if (socketRef.current) socketRef.current.disconnect();
   };
 
-  const fetchUsers = async () => {
-    try {
-      const res = await fetch(`${SERVER}/private/users`);
-      const data = await res.json();
-      setUsersList(data);
-    } catch (err) { console.log('Error fetching users:', err); }
-  };
-
   const fetchConversations = async (uname) => {
     try {
       const res = await fetch(`${SERVER}/private/conversations/${uname}`);
       const data = await res.json();
       setConversations(data);
     } catch (err) { console.log('Error fetching conversations:', err); }
+  };
+
+  const cleanupConversations = async (uname) => {
+    try {
+      await fetch(`${SERVER}/private/conversations/cleanup/${uname}`, { method: 'DELETE' });
+      fetchConversations(uname);
+    } catch (err) { console.log('Cleanup error:', err); }
   };
 
   const handleSearch = async (query) => {
@@ -177,8 +175,15 @@ function App() {
       fetchConversations(uname);
     });
 
+    const cleanupInterval = setInterval(() => {
+      cleanupConversations(uname);
+    }, 60000);
+
+    socket.on('disconnect', () => {
+      clearInterval(cleanupInterval);
+    });
+
     setScreen('chat');
-    fetchUsers();
     fetchConversations(uname);
   };
 
@@ -403,7 +408,7 @@ function App() {
       </div>
       <div style={styles.searchContainer}>
         <input style={styles.searchInput}
-          placeholder="🔍 Search users..."
+          placeholder="🔍 Search users to start a new chat..."
           value={searchQuery}
           onChange={e => handleSearch(e.target.value)} />
       </div>
@@ -411,7 +416,9 @@ function App() {
         {searchQuery.length > 0 ? (
           <div>
             <p style={styles.sectionTitle}>Search Results</p>
-            {searchResults.length === 0 && <p style={styles.noResults}>No users found for "{searchQuery}"</p>}
+            {searchResults.length === 0 && (
+              <p style={styles.noResults}>No users found for "{searchQuery}"</p>
+            )}
             {searchResults.filter(u => u.username !== username).map((u, i) => (
               <div key={i} style={styles.convCard} onClick={() => openPrivateChat(u.username)}>
                 <div style={{...styles.convAvatar, position: 'relative'}}>
@@ -433,51 +440,42 @@ function App() {
           </div>
         ) : (
           <div>
-            {conversations.length > 0 && <p style={styles.sectionTitle}>Recent</p>}
-            {conversations.map((conv, i) => {
-              const other = getOtherParticipant(conv);
-              const unread = getUnreadCount(conv);
-              return (
-                <div key={i} style={{...styles.convCard, ...(unread > 0 ? styles.convCardUnread : {})}} onClick={() => openPrivateChat(other)}>
-                  <div style={{...styles.convAvatar, position: 'relative'}}>
-                    {other.charAt(0).toUpperCase()}
-                    <OnlineDot isOnline={isOnline(other)} />
-                  </div>
-                  <div style={styles.convInfo}>
-                    <div style={styles.convHeader}>
-                      <span style={styles.convName}>{other}</span>
-                      <span style={styles.convTime}>{formatTime(conv.lastMessageTime)}</span>
-                    </div>
-                    <div style={styles.convFooter}>
-                      <span style={styles.convLastMsg}>
-                        {conv.lastMessageFrom === username ? '✓ You: ' : ''}
-                        {conv.lastMessage?.substring(0, 30)}{conv.lastMessage?.length > 30 ? '...' : ''}
-                      </span>
-                      {unread > 0 && <span style={styles.unreadBadge}>{unread}</span>}
-                    </div>
-                  </div>
-                </div>
-              );
-            })}
-            <p style={styles.sectionTitle}>All Users</p>
-            {usersList.filter(u => u.username !== username).map((u, i) => (
-              <div key={i} style={styles.convCard} onClick={() => openPrivateChat(u.username)}>
-                <div style={{...styles.convAvatar, position: 'relative'}}>
-                  {u.username.charAt(0).toUpperCase()}
-                  <OnlineDot isOnline={isOnline(u.username)} />
-                </div>
-                <div style={styles.convInfo}>
-                  <div style={styles.convHeader}>
-                    <span style={styles.convName}>{u.username}</span>
-                    <span style={{...styles.onlineStatusText, color: isOnline(u.username) ? '#51cf66' : '#888'}}>
-                      {isOnline(u.username) ? '● Online' : '○ Offline'}
-                    </span>
-                  </div>
-                  <div style={styles.convLastMsg}>🔒 Tap to message</div>
-                </div>
-                <span style={styles.dmStartBtn}>DM</span>
+            {conversations.length === 0 ? (
+              <div style={styles.emptyState}>
+                <div style={styles.emptyIcon}>💬</div>
+                <p style={styles.emptyText}>No conversations yet</p>
+                <p style={styles.emptySubtext}>Search for a user above to start chatting</p>
               </div>
-            ))}
+            ) : (
+              <div>
+                <p style={styles.sectionTitle}>Conversations</p>
+                {conversations.map((conv, i) => {
+                  const other = getOtherParticipant(conv);
+                  const unread = getUnreadCount(conv);
+                  return (
+                    <div key={i} style={{...styles.convCard, ...(unread > 0 ? styles.convCardUnread : {})}} onClick={() => openPrivateChat(other)}>
+                      <div style={{...styles.convAvatar, position: 'relative'}}>
+                        {other.charAt(0).toUpperCase()}
+                        <OnlineDot isOnline={isOnline(other)} />
+                      </div>
+                      <div style={styles.convInfo}>
+                        <div style={styles.convHeader}>
+                          <span style={styles.convName}>{other}</span>
+                          <span style={styles.convTime}>{formatTime(conv.lastMessageTime)}</span>
+                        </div>
+                        <div style={styles.convFooter}>
+                          <span style={styles.convLastMsg}>
+                            {conv.lastMessageFrom === username ? '✓ You: ' : ''}
+                            {conv.lastMessage?.substring(0, 30)}{conv.lastMessage?.length > 30 ? '...' : ''}
+                          </span>
+                          {unread > 0 && <span style={styles.unreadBadge}>{unread}</span>}
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
           </div>
         )}
       </div>
@@ -578,7 +576,7 @@ function App() {
           <div style={{...styles.statusBadge, display: 'flex'}}>
             <span style={connected ? styles.dotGreen : styles.dotRed}>●</span>
           </div>
-          <button style={styles.privateBtn} onClick={() => { fetchUsers(); fetchConversations(username); setScreen('users'); }}>
+          <button style={styles.privateBtn} onClick={() => { fetchConversations(username); setScreen('users'); }}>
             💬 {totalUnread > 0 && <span style={styles.unreadBadgeSmall}>{totalUnread}</span>}
           </button>
           <button style={styles.leaveBtn} onClick={leaveRoom}>⬅</button>
