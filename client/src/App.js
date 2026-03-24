@@ -5,11 +5,28 @@ const SERVER = process.env.REACT_APP_SERVER_URL || 'http://localhost:3001';
 
 const OnlineDot = ({ isOnline }) => (
   <span style={{
-    position: 'absolute', bottom: '0', right: '0',
-    width: '12px', height: '12px', borderRadius: '50%',
-    background: isOnline ? '#51cf66' : '#555',
-    border: '2px solid #0f0c29',
+    position: 'absolute', bottom: '1px', right: '1px',
+    width: '10px', height: '10px', borderRadius: '50%',
+    background: isOnline ? '#00e5a0' : '#3a3a4a',
+    border: '2px solid #0a0a0f',
+    boxShadow: isOnline ? '0 0 6px #00e5a0' : 'none',
   }} />
+);
+
+const Avatar = ({ name, size = 40, gradient = false }) => (
+  <div style={{
+    width: size, height: size, borderRadius: '50%', flexShrink: 0,
+    background: gradient
+      ? 'linear-gradient(135deg, #ff6b35, #f7931e)'
+      : 'linear-gradient(135deg, #1a1a2e, #16213e)',
+    display: 'flex', alignItems: 'center', justifyContent: 'center',
+    color: '#fff', fontSize: size * 0.38, fontWeight: '700',
+    fontFamily: "'DM Sans', sans-serif",
+    border: '1.5px solid rgba(255,255,255,0.08)',
+    letterSpacing: '-0.02em',
+  }}>
+    {name?.charAt(0)?.toUpperCase()}
+  </div>
 );
 
 function App() {
@@ -47,9 +64,7 @@ function App() {
     const savedToken = localStorage.getItem('token');
     const savedUsername = localStorage.getItem('username');
     if (savedToken && savedUsername) {
-      setToken(savedToken);
-      setUsername(savedUsername);
-      setScreen('home');
+      setToken(savedToken); setUsername(savedUsername); setScreen('home');
     }
     const params = new URLSearchParams(window.location.search);
     const googleToken = params.get('token');
@@ -57,9 +72,7 @@ function App() {
     if (googleToken && googleUsername) {
       localStorage.setItem('token', googleToken);
       localStorage.setItem('username', googleUsername);
-      setToken(googleToken);
-      setUsername(googleUsername);
-      setScreen('home');
+      setToken(googleToken); setUsername(googleUsername); setScreen('home');
       window.history.replaceState({}, '', '/');
     }
   }, []);
@@ -70,13 +83,8 @@ function App() {
     }
   }, [username]);
 
-  useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages]);
-
-  useEffect(() => {
-    privateBottomRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [privateMessages]);
+  useEffect(() => { bottomRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [messages]);
+  useEffect(() => { privateBottomRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [privateMessages]);
 
   const handleRegister = async () => {
     setLoading(true); setError('');
@@ -90,7 +98,7 @@ function App() {
       localStorage.setItem('token', data.token);
       localStorage.setItem('username', data.user.username);
       setToken(data.token); setUsername(data.user.username); setScreen('home');
-    } catch { setError('Registration failed.'); }
+    } catch { setError('Registration failed. Please try again.'); }
     finally { setLoading(false); }
   };
 
@@ -106,7 +114,7 @@ function App() {
       localStorage.setItem('token', data.token);
       localStorage.setItem('username', data.user.username);
       setToken(data.token); setUsername(data.user.username); setScreen('home');
-    } catch { setError('Login failed.'); }
+    } catch { setError('Login failed. Please try again.'); }
     finally { setLoading(false); }
   };
 
@@ -144,16 +152,8 @@ function App() {
   };
 
   const sendBrowserNotification = (title, body) => {
-    if ('Notification' in window) {
-      if (Notification.permission === 'granted') {
-        new Notification(title, { body, icon: '/favicon.ico' });
-      } else if (Notification.permission !== 'denied') {
-        Notification.requestPermission().then(permission => {
-          if (permission === 'granted') {
-            new Notification(title, { body, icon: '/favicon.ico' });
-          }
-        });
-      }
+    if ('Notification' in window && Notification.permission === 'granted') {
+      new Notification(title, { body, icon: '/favicon.ico' });
     }
   };
 
@@ -161,53 +161,34 @@ function App() {
     if (socketRef.current?.connected) return socketRef.current;
     const socket = io(SERVER, { auth: { token }, reconnection: true });
     socketRef.current = socket;
-
-    socket.on('connect', () => {
-      setConnected(true);
-      socket.emit('register_user', uname);
-    });
+    socket.on('connect', () => { setConnected(true); socket.emit('register_user', uname); });
     socket.on('disconnect', () => setConnected(false));
     socket.on('online_count', (count) => setOnlineUsers(count));
     socket.on('online_users_list', (list) => setOnlineUsersList(list));
     socket.on('message_history', (history) => setMessages(history));
     socket.on('receive_message', (msg) => setMessages(prev => [...prev, msg]));
-    socket.on('user_typing', (user) => {
-      setTyping(`${user} is typing...`);
-      setTimeout(() => setTyping(''), 2000);
-    });
+    socket.on('user_typing', (user) => { setTyping(`${user} is typing`); setTimeout(() => setTyping(''), 2000); });
     socket.on('private_history', (history) => setPrivateMessages(history));
     socket.on('receive_private', (msg) => {
       setPrivateMessages(prev => {
-        if (msg.from === uname) {
-          const filtered = prev.filter(m => !m.temp);
-          return [...filtered, msg];
-        }
+        if (msg.from === uname) { return [...prev.filter(m => !m.temp), msg]; }
         return [...prev, msg];
       });
       fetchConversations(uname);
     });
-    socket.on('private_user_typing', (user) => {
-      setPrivateTyping(`${user} is typing...`);
-      setTimeout(() => setPrivateTyping(''), 2000);
-    });
+    socket.on('refresh_conversations', () => fetchConversations(uname));
+    socket.on('private_user_typing', (user) => { setPrivateTyping(`${user} is typing`); setTimeout(() => setPrivateTyping(''), 2000); });
     socket.on('private_notification', ({ from }) => {
-      // In-app banner
-      setNotification(`💬 New message from ${from}`);
+      setNotification(`New message from ${from}`);
       setTimeout(() => setNotification(''), 6000);
       fetchConversations(uname);
-      // Browser notification
-      sendBrowserNotification('CloudChat 🔒', `New encrypted message from ${from}`);
-    });
-    socket.on('refresh_conversations', () => {
-      fetchConversations(uname);
+      sendBrowserNotification('CloudChat', `Encrypted message from ${from}`);
     });
     socket.on('messages_expiry_updated', ({ newExpiry }) => {
       setPrivateMessages(prev => prev.map(m => ({ ...m, expiresAt: newExpiry })));
     });
-
     const cleanupInterval = setInterval(() => cleanupConversations(uname), 30000);
     socket.on('disconnect', () => clearInterval(cleanupInterval));
-
     return socket;
   };
 
@@ -220,8 +201,7 @@ function App() {
 
   const openPrivateChat = (targetUser) => {
     const socket = initSocket(username);
-    setPrivateUser(targetUser);
-    setPrivateMessages([]);
+    setPrivateUser(targetUser); setPrivateMessages([]);
     socket.emit('join_private', { from: username, to: targetUser });
     socket.emit('mark_read', { from: username, to: targetUser });
     setSearchQuery(''); setSearchResults([]);
@@ -239,13 +219,10 @@ function App() {
   const sendPrivateMessage = () => {
     if (privateMessage.trim() && socketRef.current) {
       const msgText = privateMessage;
-      const tempMsg = {
+      setPrivateMessages(prev => [...prev, {
         from: username, to: privateUser, message: msgText,
-        timestamp: new Date(),
-        expiresAt: new Date(Date.now() + 5 * 60 * 1000),
-        temp: true,
-      };
-      setPrivateMessages(prev => [...prev, tempMsg]);
+        timestamp: new Date(), expiresAt: new Date(Date.now() + 5 * 60 * 1000), temp: true,
+      }]);
       setPrivateMessage('');
       socketRef.current.emit('send_private', { from: username, to: privateUser, message: msgText });
       setTimeout(() => fetchConversations(username), 1000);
@@ -275,40 +252,19 @@ function App() {
       const res = await fetch(`${SERVER}/media/upload`, { method: 'POST', body: formData });
       const data = await res.json();
       if (data.error) { alert(data.error); return; }
+      const payload = {
+        message: `📎 ${data.originalName}`,
+        fileUrl: `${SERVER}/media/file/${data.fileId}`,
+        mimetype: data.mimetype, originalName: data.originalName,
+      };
       if (isPrivate) {
-        const tempMsg = {
-          from: username, to: privateUser,
-          message: `📎 ${data.originalName}`,
-          fileUrl: `${SERVER}/media/file/${data.fileId}`,
-          mimetype: data.mimetype,
-          originalName: data.originalName,
-          timestamp: new Date(),
-          expiresAt: new Date(Date.now() + 5 * 60 * 1000),
-          temp: true,
-        };
-        setPrivateMessages(prev => [...prev, tempMsg]);
-        socketRef.current.emit('send_private', {
-          from: username, to: privateUser,
-          message: `📎 ${data.originalName}`,
-          fileUrl: `${SERVER}/media/file/${data.fileId}`,
-          mimetype: data.mimetype,
-          originalName: data.originalName,
-        });
+        setPrivateMessages(prev => [...prev, { from: username, to: privateUser, ...payload, timestamp: new Date(), expiresAt: new Date(Date.now() + 5 * 60 * 1000), temp: true }]);
+        socketRef.current.emit('send_private', { from: username, to: privateUser, ...payload });
       } else {
-        socketRef.current.emit('send_message', {
-          room, username,
-          message: `📎 ${data.originalName}`,
-          fileId: data.fileId,
-          fileUrl: `${SERVER}/media/file/${data.fileId}`,
-          mimetype: data.mimetype,
-          originalName: data.originalName,
-        });
+        socketRef.current.emit('send_message', { room, username, fileId: data.fileId, ...payload });
       }
     } catch (err) { alert('Upload failed: ' + err.message); }
-    finally {
-      isPrivate ? setPrivateUploading(false) : setUploading(false);
-      e.target.value = '';
-    }
+    finally { isPrivate ? setPrivateUploading(false) : setUploading(false); e.target.value = ''; }
   };
 
   const leaveRoom = () => {
@@ -319,10 +275,10 @@ function App() {
   const renderMedia = (msg) => {
     if (!msg.fileUrl) return null;
     const mime = msg.mimetype || '';
-    if (mime.startsWith('image/')) return <img src={msg.fileUrl} alt={msg.originalName} style={styles.mediaImage} onClick={() => window.open(msg.fileUrl, '_blank')} />;
-    if (mime.startsWith('video/')) return <video controls style={styles.mediaVideo}><source src={msg.fileUrl} type={mime} /></video>;
-    if (mime.startsWith('audio/')) return <audio controls style={styles.mediaAudio}><source src={msg.fileUrl} type={mime} /></audio>;
-    return <a href={msg.fileUrl} target="_blank" rel="noreferrer" style={styles.fileLink}>📎 {msg.originalName}</a>;
+    if (mime.startsWith('image/')) return <img src={msg.fileUrl} alt={msg.originalName} style={s.mediaImage} onClick={() => window.open(msg.fileUrl, '_blank')} />;
+    if (mime.startsWith('video/')) return <video controls style={s.mediaVideo}><source src={msg.fileUrl} type={mime} /></video>;
+    if (mime.startsWith('audio/')) return <audio controls style={s.mediaAudio}><source src={msg.fileUrl} type={mime} /></audio>;
+    return <a href={msg.fileUrl} target="_blank" rel="noreferrer" style={s.fileLink}>📎 {msg.originalName}</a>;
   };
 
   const getUnreadCount = (conv) => conv.unreadCount?.[username] || 0;
@@ -331,600 +287,806 @@ function App() {
     if (!date) return '';
     const d = new Date(date), diff = new Date() - d;
     if (diff < 60000) return 'now';
-    if (diff < 3600000) return `${Math.floor(diff / 60000)}m`;
-    if (diff < 86400000) return `${Math.floor(diff / 3600000)}h`;
+    if (diff < 3600000) return `${Math.floor(diff / 60000)}m ago`;
+    if (diff < 86400000) return `${Math.floor(diff / 3600000)}h ago`;
     return d.toLocaleDateString();
   };
   const totalUnread = conversations.reduce((acc, c) => acc + getUnreadCount(c), 0);
   const isOnline = (uname) => onlineUsersList.includes(uname);
 
-  // ─── LOGIN ───
+  // ── AUTH SCREENS ──
+  const AuthShell = ({ children }) => (
+    <div style={s.authBg}>
+      <style>{CSS}</style>
+      <div style={s.authNoise} />
+      <div style={s.authGlow1} />
+      <div style={s.authGlow2} />
+      <div style={s.authCard}>{children}</div>
+    </div>
+  );
+
+  const LogoMark = ({ subtitle }) => (
+    <div style={{ textAlign: 'center', marginBottom: '8px' }}>
+      <div style={s.logoMark}>
+        <span style={{ fontSize: '20px' }}>☁</span>
+      </div>
+      <div style={s.brandName}>CloudChat</div>
+      {subtitle && <div style={s.brandSub}>{subtitle}</div>}
+    </div>
+  );
+
   if (screen === 'login') return (
-    <div style={styles.authContainer}>
-      <style>{CSS}</style>
-      <div style={styles.authBox}>
-        <div style={styles.logoContainer}><span style={styles.logoIcon}>☁️</span><h1 style={styles.logo}>CloudChat</h1></div>
-        <p style={styles.subtitle}>Sign in to continue</p>
-        {error && <div style={styles.errorBox}>{error}</div>}
-        <div style={styles.inputGroup}><label style={styles.label}>Email</label>
-          <input style={styles.input} type="email" placeholder="your@email.com" value={email} onChange={e => setEmail(e.target.value)} onKeyDown={e => e.key === 'Enter' && handleLogin()} /></div>
-        <div style={styles.inputGroup}><label style={styles.label}>Password</label>
-          <input style={styles.input} type="password" placeholder="••••••••" value={password} onChange={e => setPassword(e.target.value)} onKeyDown={e => e.key === 'Enter' && handleLogin()} /></div>
-        <button style={styles.primaryBtn} onClick={handleLogin} disabled={loading}>{loading ? 'Signing in...' : 'Sign In →'}</button>
-        <div style={styles.divider}><span>or</span></div>
-        <button style={styles.googleBtn} onClick={handleGoogleLogin}><span style={styles.googleIcon}>G</span> Continue with Google</button>
-        <p style={styles.switchText}>Don't have an account?{' '}<span style={styles.switchLink} onClick={() => { setScreen('register'); setError(''); }}>Register</span></p>
+    <AuthShell>
+      <LogoMark subtitle="Welcome back" />
+      {error && <div style={s.errorPill}>{error}</div>}
+      <div style={s.fieldGroup}>
+        <label style={s.fieldLabel}>Email address</label>
+        <input style={s.field} type="email" placeholder="you@example.com" value={email}
+          onChange={e => setEmail(e.target.value)} onKeyDown={e => e.key === 'Enter' && handleLogin()} />
       </div>
-    </div>
+      <div style={s.fieldGroup}>
+        <label style={s.fieldLabel}>Password</label>
+        <input style={s.field} type="password" placeholder="••••••••••" value={password}
+          onChange={e => setPassword(e.target.value)} onKeyDown={e => e.key === 'Enter' && handleLogin()} />
+      </div>
+      <button style={s.primaryBtn} onClick={handleLogin} disabled={loading}>
+        {loading ? <span style={s.spinner}>⟳</span> : 'Sign in'}
+      </button>
+      <div style={s.orRow}><div style={s.orLine} /><span style={s.orText}>or</span><div style={s.orLine} /></div>
+      <button style={s.googleBtn} onClick={handleGoogleLogin}>
+        <svg width="18" height="18" viewBox="0 0 18 18"><path fill="#4285F4" d="M16.51 8H8.98v3h4.3c-.18 1-.74 1.48-1.6 2.04v2.01h2.6a7.8 7.8 0 0 0 2.38-5.88c0-.57-.05-.66-.15-1.18z"/><path fill="#34A853" d="M8.98 17c2.16 0 3.97-.72 5.3-1.94l-2.6-2a4.8 4.8 0 0 1-7.18-2.54H1.83v2.07A8 8 0 0 0 8.98 17z"/><path fill="#FBBC05" d="M4.5 10.52a4.8 4.8 0 0 1 0-3.04V5.41H1.83a8 8 0 0 0 0 7.18l2.67-2.07z"/><path fill="#EA4335" d="M8.98 4.18c1.17 0 2.23.4 3.06 1.2l2.3-2.3A8 8 0 0 0 1.83 5.4L4.5 7.49a4.77 4.77 0 0 1 4.48-3.3z"/></svg>
+        Continue with Google
+      </button>
+      <p style={s.switchRow}>New to CloudChat?{' '}
+        <span style={s.switchLink} onClick={() => { setScreen('register'); setError(''); }}>Create account</span>
+      </p>
+    </AuthShell>
   );
 
-  // ─── REGISTER ───
   if (screen === 'register') return (
-    <div style={styles.authContainer}>
-      <style>{CSS}</style>
-      <div style={styles.authBox}>
-        <div style={styles.logoContainer}><span style={styles.logoIcon}>☁️</span><h1 style={styles.logo}>CloudChat</h1></div>
-        <p style={styles.subtitle}>Create your account</p>
-        {error && <div style={styles.errorBox}>{error}</div>}
-        <div style={styles.inputGroup}><label style={styles.label}>Username</label>
-          <input style={styles.input} placeholder="cooluser123" value={username} onChange={e => setUsername(e.target.value)} /></div>
-        <div style={styles.inputGroup}><label style={styles.label}>Email</label>
-          <input style={styles.input} type="email" placeholder="your@email.com" value={email} onChange={e => setEmail(e.target.value)} /></div>
-        <div style={styles.inputGroup}><label style={styles.label}>Password</label>
-          <input style={styles.input} type="password" placeholder="••••••••" value={password} onChange={e => setPassword(e.target.value)} /></div>
-        <button style={styles.primaryBtn} onClick={handleRegister} disabled={loading}>{loading ? 'Creating account...' : 'Create Account →'}</button>
-        <div style={styles.divider}><span>or</span></div>
-        <button style={styles.googleBtn} onClick={handleGoogleLogin}><span style={styles.googleIcon}>G</span> Continue with Google</button>
-        <p style={styles.switchText}>Already have an account?{' '}<span style={styles.switchLink} onClick={() => { setScreen('login'); setError(''); }}>Sign In</span></p>
+    <AuthShell>
+      <LogoMark subtitle="Create your account" />
+      {error && <div style={s.errorPill}>{error}</div>}
+      <div style={s.fieldGroup}>
+        <label style={s.fieldLabel}>Username</label>
+        <input style={s.field} placeholder="cooluser123" value={username} onChange={e => setUsername(e.target.value)} />
       </div>
-    </div>
+      <div style={s.fieldGroup}>
+        <label style={s.fieldLabel}>Email address</label>
+        <input style={s.field} type="email" placeholder="you@example.com" value={email} onChange={e => setEmail(e.target.value)} />
+      </div>
+      <div style={s.fieldGroup}>
+        <label style={s.fieldLabel}>Password</label>
+        <input style={s.field} type="password" placeholder="••••••••••" value={password} onChange={e => setPassword(e.target.value)} />
+      </div>
+      <button style={s.primaryBtn} onClick={handleRegister} disabled={loading}>
+        {loading ? <span style={s.spinner}>⟳</span> : 'Create account'}
+      </button>
+      <div style={s.orRow}><div style={s.orLine} /><span style={s.orText}>or</span><div style={s.orLine} /></div>
+      <button style={s.googleBtn} onClick={handleGoogleLogin}>
+        <svg width="18" height="18" viewBox="0 0 18 18"><path fill="#4285F4" d="M16.51 8H8.98v3h4.3c-.18 1-.74 1.48-1.6 2.04v2.01h2.6a7.8 7.8 0 0 0 2.38-5.88c0-.57-.05-.66-.15-1.18z"/><path fill="#34A853" d="M8.98 17c2.16 0 3.97-.72 5.3-1.94l-2.6-2a4.8 4.8 0 0 1-7.18-2.54H1.83v2.07A8 8 0 0 0 8.98 17z"/><path fill="#FBBC05" d="M4.5 10.52a4.8 4.8 0 0 1 0-3.04V5.41H1.83a8 8 0 0 0 0 7.18l2.67-2.07z"/><path fill="#EA4335" d="M8.98 4.18c1.17 0 2.23.4 3.06 1.2l2.3-2.3A8 8 0 0 0 1.83 5.4L4.5 7.49a4.77 4.77 0 0 1 4.48-3.3z"/></svg>
+        Continue with Google
+      </button>
+      <p style={s.switchRow}>Already have an account?{' '}
+        <span style={s.switchLink} onClick={() => { setScreen('login'); setError(''); }}>Sign in</span>
+      </p>
+    </AuthShell>
   );
 
-  // ─── HOME ───
+  // ── HOME ──
   if (screen === 'home') return (
-    <div style={styles.authContainer}>
+    <div style={s.authBg}>
       <style>{CSS}</style>
-      <div style={{...styles.authBox, maxWidth: '480px'}}>
-        <div style={styles.logoContainer}><span style={styles.logoIcon}>☁️</span><h1 style={styles.logo}>CloudChat</h1></div>
-        <p style={styles.subtitle}>Welcome back, <strong style={{color:'#f5a623'}}>{username}</strong>!</p>
-        <div style={styles.homeCard} onClick={() => setScreen('roomSelect')}>
-          <div style={styles.homeCardIcon}>💬</div>
-          <div style={styles.homeCardInfo}>
-            <div style={styles.homeCardTitle}>Group Chat</div>
-            <div style={styles.homeCardSub}>Join public rooms • Real-time • Auto-delete 5min • Media sharing</div>
-          </div>
-          <span style={styles.homeCardArrow}>→</span>
+      <div style={s.authNoise} />
+      <div style={s.authGlow1} />
+      <div style={s.authGlow2} />
+      <div style={{...s.authCard, maxWidth: '460px'}}>
+        <div style={{ textAlign: 'center', marginBottom: '4px' }}>
+          <div style={s.logoMark}><span style={{ fontSize: '20px' }}>☁</span></div>
+          <div style={s.brandName}>CloudChat</div>
+          <div style={s.homeGreeting}>Good to see you, <span style={s.homeUsername}>{username}</span></div>
         </div>
-        <div style={styles.homeCard} onClick={() => { fetchConversations(username); initSocket(username); setScreen('users'); }}>
-          <div style={{...styles.homeCardIcon, background: 'linear-gradient(135deg, #51cf66, #2f9e44)'}}>🔐</div>
-          <div style={styles.homeCardInfo}>
-            <div style={styles.homeCardTitle}>
-              Private Messages
-              {totalUnread > 0 && <span style={styles.homeBadge}>{totalUnread}</span>}
+
+        <div style={s.homeCardRow}>
+          <div style={s.homeCard} onClick={() => setScreen('roomSelect')}>
+            <div style={s.homeCardIconWrap}>
+              <span style={{ fontSize: '22px' }}>💬</span>
             </div>
-            <div style={styles.homeCardSub}>E2E Encrypted • Auto-delete 5min • Media sharing</div>
+            <div style={s.homeCardBody}>
+              <div style={s.homeCardTitle}>Group Rooms</div>
+              <div style={s.homeCardMeta}>4 rooms • real-time • 5min auto-delete</div>
+            </div>
+            <div style={s.homeCardChevron}>›</div>
           </div>
-          <span style={styles.homeCardArrow}>→</span>
-        </div>
-        <button style={styles.logoutBtn} onClick={handleLogout}>Sign Out</button>
-      </div>
-    </div>
-  );
 
-  // ─── ROOM SELECT ───
-  if (screen === 'roomSelect') return (
-    <div style={styles.authContainer}>
-      <style>{CSS}</style>
-      <div style={styles.authBox}>
-        <button style={styles.backBtnFull} onClick={() => setScreen('home')}>← Back</button>
-        <div style={styles.logoContainer}><span style={styles.logoIcon}>💬</span><h1 style={styles.logo}>Group Chat</h1></div>
-        <p style={styles.subtitle}>Select a room to join</p>
-        <div style={styles.inputGroup}><label style={styles.label}>Select Room</label>
-          <select style={styles.select} value={room} onChange={e => setRoom(e.target.value)}>
-            <option value="general">💬 General</option>
-            <option value="tech">💻 Tech Talk</option>
-            <option value="cloud">☁️ Cloud Engineering</option>
-            <option value="random">🎲 Random</option>
-          </select>
-        </div>
-        <button style={styles.primaryBtn} onClick={joinGroupChat}>Join #{room} →</button>
-      </div>
-    </div>
-  );
-
-  // ─── DM LIST ───
-  if (screen === 'users') return (
-    <div style={styles.chatContainer}>
-      <style>{CSS}</style>
-      <div style={styles.header}>
-        <div style={styles.headerLeft}>
-          <button style={styles.backBtn} onClick={() => setScreen('home')}>←</button>
-          <span style={styles.headerIcon}>🔐</span>
-          <div><h2 style={styles.headerTitle}>Private Messages</h2><p style={styles.headerSub}>🔒 E2E Encrypted</p></div>
-        </div>
-        <div style={styles.headerRight}>
-          <div style={styles.userBadge}>👤 {username}</div>
-          <button style={styles.logoutBtn2} onClick={handleLogout}>⏻</button>
-        </div>
-      </div>
-      <div style={styles.searchContainer}>
-        <input style={styles.searchInput} placeholder="🔍 Search users to start a new chat..."
-          value={searchQuery} onChange={e => handleSearch(e.target.value)} />
-      </div>
-      <div style={styles.dmListContainer}>
-        {searchQuery.length > 0 ? (
-          <div>
-            <p style={styles.sectionTitle}>Search Results</p>
-            {searchResults.length === 0 && <p style={styles.noResults}>No users found for "{searchQuery}"</p>}
-            {searchResults.filter(u => u.username !== username).map((u, i) => (
-              <div key={i} style={styles.convCard} onClick={() => openPrivateChat(u.username)}>
-                <div style={{...styles.convAvatar, position: 'relative'}}>
-                  {u.username.charAt(0).toUpperCase()}<OnlineDot isOnline={isOnline(u.username)} />
-                </div>
-                <div style={styles.convInfo}>
-                  <div style={styles.convHeader}>
-                    <div style={{display:'flex', alignItems:'center', gap:'6px'}}>
-                      <span style={styles.convName}>{u.username}</span>
-                      <span style={{fontSize:'9px', color: isOnline(u.username) ? '#51cf66' : '#666'}}>
-                        {isOnline(u.username) ? '● online' : '○ offline'}
-                      </span>
-                    </div>
-                  </div>
-                  <div style={styles.convLastMsg}>🔒 Tap to start encrypted chat</div>
-                </div>
-                <span style={styles.dmStartBtn}>DM</span>
+          <div style={{...s.homeCard, borderColor: totalUnread > 0 ? 'rgba(0,229,160,0.3)' : 'rgba(255,255,255,0.06)'}}
+            onClick={() => { fetchConversations(username); initSocket(username); setScreen('users'); }}>
+            <div style={{...s.homeCardIconWrap, background: 'linear-gradient(135deg, rgba(0,229,160,0.15), rgba(0,200,140,0.05))'}}>
+              <span style={{ fontSize: '22px' }}>🔐</span>
+            </div>
+            <div style={s.homeCardBody}>
+              <div style={s.homeCardTitle}>
+                Private Messages
+                {totalUnread > 0 && <span style={s.unreadPill}>{totalUnread}</span>}
               </div>
-            ))}
+              <div style={s.homeCardMeta}>E2E encrypted • 5min delete • media</div>
+            </div>
+            <div style={s.homeCardChevron}>›</div>
+          </div>
+        </div>
+
+        <button style={s.signOutBtn} onClick={handleLogout}>Sign out</button>
+
+        <div style={s.techBadgeRow}>
+          {['WebSocket','Redis','MongoDB','Docker','JWT','E2E'].map(t => (
+            <span key={t} style={s.techBadge}>{t}</span>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+
+  // ── ROOM SELECT ──
+  if (screen === 'roomSelect') return (
+    <div style={s.authBg}>
+      <style>{CSS}</style>
+      <div style={s.authNoise} />
+      <div style={s.authCard}>
+        <button style={s.backLink} onClick={() => setScreen('home')}>← Back</button>
+        <LogoMark subtitle="Choose a room" />
+        <div style={s.roomGrid}>
+          {[
+            { id: 'general', emoji: '💬', label: 'General', desc: 'Open discussion' },
+            { id: 'tech', emoji: '💻', label: 'Tech Talk', desc: 'Dev & engineering' },
+            { id: 'cloud', emoji: '☁️', label: 'Cloud Eng', desc: 'Cloud architecture' },
+            { id: 'random', emoji: '🎲', label: 'Random', desc: 'Anything goes' },
+          ].map(r => (
+            <div key={r.id} style={{...s.roomTile, ...(room === r.id ? s.roomTileActive : {})}}
+              onClick={() => setRoom(r.id)}>
+              <div style={s.roomEmoji}>{r.emoji}</div>
+              <div style={s.roomLabel}>{r.label}</div>
+              <div style={s.roomDesc}>{r.desc}</div>
+            </div>
+          ))}
+        </div>
+        <button style={s.primaryBtn} onClick={joinGroupChat}>Join #{room}</button>
+      </div>
+    </div>
+  );
+
+  // ── APP SHELL (for chat screens) ──
+  const AppHeader = ({ left, right, sub }) => (
+    <div style={s.appHeader}>
+      <div style={s.appHeaderLeft}>{left}</div>
+      {sub && <div style={s.appHeaderSub}>{sub}</div>}
+      <div style={s.appHeaderRight}>{right}</div>
+    </div>
+  );
+
+  // ── DM LIST ──
+  if (screen === 'users') return (
+    <div style={s.appShell}>
+      <style>{CSS}</style>
+      <AppHeader
+        left={<>
+          <button style={s.iconBtn} onClick={() => setScreen('home')}>←</button>
+          <div>
+            <div style={s.appTitle}>Messages</div>
+            <div style={s.appSubtitle}>End-to-end encrypted</div>
+          </div>
+        </>}
+        right={<>
+          <div style={s.avatarChip}>{username?.charAt(0)?.toUpperCase()}</div>
+          <button style={s.iconBtn} onClick={handleLogout} title="Sign out">⏻</button>
+        </>}
+      />
+      <div style={s.searchWrap}>
+        <div style={s.searchIcon}>⌕</div>
+        <input style={s.searchField} placeholder="Search people..." value={searchQuery}
+          onChange={e => handleSearch(e.target.value)} />
+        {searchQuery && <button style={s.clearBtn} onClick={() => { setSearchQuery(''); setSearchResults([]); }}>✕</button>}
+      </div>
+      <div style={s.listArea}>
+        {searchQuery.length > 0 ? (
+          <>
+            <div style={s.listSection}>Search results</div>
+            {searchResults.length === 0
+              ? <div style={s.emptyHint}>No users found for "{searchQuery}"</div>
+              : searchResults.filter(u => u.username !== username).map((u, i) => (
+                <div key={i} style={s.dmRow} onClick={() => openPrivateChat(u.username)}>
+                  <div style={{ position: 'relative', flexShrink: 0 }}>
+                    <Avatar name={u.username} size={44} />
+                    <OnlineDot isOnline={isOnline(u.username)} />
+                  </div>
+                  <div style={s.dmRowBody}>
+                    <div style={s.dmRowName}>{u.username}</div>
+                    <div style={s.dmRowMeta}>{isOnline(u.username) ? '● Online' : '○ Offline'}</div>
+                  </div>
+                  <div style={s.dmRowAction}>Message</div>
+                </div>
+              ))}
+          </>
+        ) : conversations.length === 0 ? (
+          <div style={s.emptyState}>
+            <div style={s.emptyEmoji}>🔐</div>
+            <div style={s.emptyTitle}>No conversations</div>
+            <div style={s.emptyDesc}>Search for someone to start an encrypted chat</div>
           </div>
         ) : (
-          <div>
-            {conversations.length === 0 ? (
-              <div style={styles.emptyState}>
-                <div style={styles.emptyIcon}>🔐</div>
-                <p style={styles.emptyText}>No conversations yet</p>
-                <p style={styles.emptySubtext}>Search for a user above to start chatting</p>
-              </div>
-            ) : (
-              <div>
-                <p style={styles.sectionTitle}>Conversations</p>
-                {conversations.map((conv, i) => {
-                  const other = getOtherParticipant(conv);
-                  const unread = getUnreadCount(conv);
-                  return (
-                    <div key={i} style={{...styles.convCard, ...(unread > 0 ? styles.convCardUnread : {})}}
-                      onClick={() => openPrivateChat(other)}>
-                      <div style={{...styles.convAvatar, position: 'relative'}}>
-                        {other.charAt(0).toUpperCase()}<OnlineDot isOnline={isOnline(other)} />
-                      </div>
-                      <div style={styles.convInfo}>
-                        <div style={styles.convHeader}>
-                          <div style={{display:'flex', alignItems:'center', gap:'6px'}}>
-                            <span style={{...styles.convName, fontWeight: unread > 0 ? '800' : '600'}}>{other}</span>
-                            <span style={{fontSize:'9px', color: isOnline(other) ? '#51cf66' : '#666'}}>
-                              {isOnline(other) ? '● online' : '○ offline'}
-                            </span>
-                          </div>
-                          <span style={styles.convTime}>{formatTime(conv.lastMessageTime)}</span>
-                        </div>
-                        <div style={styles.convFooter}>
-                          {unread > 0 ? (
-                            <span style={{...styles.convLastMsg, color: '#51cf66', fontWeight: '600'}}>
-                              🔒 {unread} new message{unread > 1 ? 's' : ''}
-                            </span>
-                          ) : conv.lastMessageFrom === username ? (
-                            <span style={styles.convLastMsg}>✓ You sent a message</span>
-                          ) : (
-                            <span style={styles.convLastMsg}>🔒 Encrypted message</span>
-                          )}
-                          {unread > 0 && <span style={styles.unreadBadge}>{unread}</span>}
-                        </div>
-                      </div>
+          <>
+            <div style={s.listSection}>Recent</div>
+            {conversations.map((conv, i) => {
+              const other = getOtherParticipant(conv);
+              const unread = getUnreadCount(conv);
+              return (
+                <div key={i} style={{...s.dmRow, ...(unread > 0 ? s.dmRowUnread : {})}}
+                  onClick={() => openPrivateChat(other)}>
+                  <div style={{ position: 'relative', flexShrink: 0 }}>
+                    <Avatar name={other} size={44} />
+                    <OnlineDot isOnline={isOnline(other)} />
+                  </div>
+                  <div style={s.dmRowBody}>
+                    <div style={s.dmRowTop}>
+                      <span style={{...s.dmRowName, fontWeight: unread > 0 ? '700' : '500'}}>{other}</span>
+                      <span style={s.dmRowTime}>{formatTime(conv.lastMessageTime)}</span>
                     </div>
-                  );
-                })}
-              </div>
-            )}
-          </div>
+                    <div style={s.dmRowBottom}>
+                      <span style={{...s.dmRowPreview, color: unread > 0 ? '#00e5a0' : 'rgba(255,255,255,0.35)'}}>
+                        {conv.lastMessageFrom === username
+                          ? 'You: sent a message'
+                          : unread > 0
+                            ? `${unread} new encrypted message${unread > 1 ? 's' : ''}`
+                            : 'Encrypted message'}
+                      </span>
+                      {unread > 0 && <span style={s.unreadCircle}>{unread}</span>}
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </>
         )}
       </div>
     </div>
   );
 
-  // ─── PRIVATE CHAT ───
+  // ── PRIVATE CHAT ──
   if (screen === 'private') return (
-    <div style={styles.chatContainer}>
+    <div style={s.appShell}>
       <style>{CSS}</style>
-      <div style={styles.header}>
-        <div style={styles.headerLeft}>
-          <button style={styles.backBtn} onClick={() => setScreen('users')}>←</button>
-          <div style={{...styles.convAvatar, position: 'relative'}}>
-            {privateUser.charAt(0).toUpperCase()}<OnlineDot isOnline={isOnline(privateUser)} />
+      <div style={s.appHeader}>
+        <div style={s.appHeaderLeft}>
+          <button style={s.iconBtn} onClick={() => setScreen('users')}>←</button>
+          <div style={{ position: 'relative', flexShrink: 0 }}>
+            <Avatar name={privateUser} size={36} />
+            <OnlineDot isOnline={isOnline(privateUser)} />
           </div>
           <div>
-            <h2 style={styles.headerTitle}>{privateUser}</h2>
-            <p style={styles.headerSub}>
-              <span style={{color: isOnline(privateUser) ? '#51cf66' : '#888'}}>
-                {isOnline(privateUser) ? '● Online' : '○ Offline'}
-              </span>
-              {' • '}🔒 E2E • 5min delete
-            </p>
+            <div style={s.appTitle}>{privateUser}</div>
+            <div style={{...s.appSubtitle, color: isOnline(privateUser) ? '#00e5a0' : 'rgba(255,255,255,0.35)'}}>
+              {isOnline(privateUser) ? '● Online' : '○ Offline'} · 🔒 E2E · 5min delete
+            </div>
           </div>
         </div>
-        <div style={styles.headerRight}>
-          <button style={styles.logoutBtn2} onClick={handleLogout}>⏻</button>
+        <div style={s.appHeaderRight}>
+          <button style={s.iconBtn} onClick={handleLogout}>⏻</button>
         </div>
       </div>
-      <div style={styles.privateBanner}>🔐 AES-256 • 🕐 5min auto-delete after reading • 👁️ Only you & {privateUser}</div>
-      <div style={styles.messagesContainer}>
+
+      <div style={s.e2eBanner}>
+        <span style={s.e2eBannerDot}>🔐</span>
+        AES-256 encrypted · Messages delete 5 min after reading · Only you & {privateUser}
+      </div>
+
+      <div style={s.msgArea}>
         {privateMessages.length === 0 && (
-          <div style={styles.emptyState}>
-            <div style={styles.emptyIcon}>🔐</div>
-            <p style={styles.emptyText}>Encrypted Chat</p>
-            <p style={styles.emptySubtext}>5min countdown starts when recipient reads</p>
+          <div style={s.emptyState}>
+            <div style={s.emptyEmoji}>🔐</div>
+            <div style={s.emptyTitle}>Encrypted conversation</div>
+            <div style={s.emptyDesc}>5-minute countdown begins when {privateUser} reads your message</div>
           </div>
         )}
-        {privateMessages.map((m, i) => (
-          <div key={i} style={m.from === username ? styles.myMessageWrapper : styles.otherMessageWrapper}>
-            {m.from !== username && <div style={styles.avatarSmall}>{m.from.charAt(0).toUpperCase()}</div>}
-            <div style={styles.messageContent}>
-              {m.from !== username && <div style={styles.msgUsername}>{m.from}</div>}
-              <div style={{...(m.from === username ? styles.myBubble : styles.otherBubble), opacity: m.temp ? 0.7 : 1}}>
-                {m.fileUrl ? renderMedia(m) : `🔒 ${m.message}`}
+        {privateMessages.map((m, i) => {
+          const mine = m.from === username;
+          return (
+            <div key={i} style={mine ? s.msgRowMine : s.msgRowTheirs}>
+              {!mine && <Avatar name={m.from} size={28} />}
+              <div style={s.msgBubbleWrap}>
+                <div style={{...( mine ? s.bubbleMine : s.bubbleTheirs), opacity: m.temp ? 0.6 : 1}}>
+                  {m.fileUrl ? renderMedia(m) : (mine ? m.message : `${m.message}`)}
+                </div>
+                <div style={s.msgMeta}>
+                  {m.temp ? '⏳ Sending…' : new Date(m.timestamp).toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'})}
+                  {m.expiresAt && !m.temp && (
+                    <span style={s.expiryTag}>· 🔥 {new Date(m.expiresAt).toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'})}</span>
+                  )}
+                </div>
               </div>
-              <div style={styles.msgTime}>
-                {m.temp ? '⏳ sending...' : new Date(m.timestamp).toLocaleTimeString()}
-                {m.expiresAt && !m.temp && <span style={styles.expiryText}> • 🔥 {new Date(m.expiresAt).toLocaleTimeString()}</span>}
-              </div>
+              {mine && <Avatar name={username} size={28} gradient />}
             </div>
-            {m.from === username && <div style={styles.avatarMeSmall}>{username.charAt(0).toUpperCase()}</div>}
-          </div>
-        ))}
+          );
+        })}
         <div ref={privateBottomRef} />
       </div>
-      {privateTyping && <div style={styles.typingIndicator}><span style={styles.typingDots}>•••</span> {privateTyping}</div>}
-      <div style={styles.inputContainer}>
+
+      {privateTyping && (
+        <div style={s.typingBar}>
+          <div style={s.typingDots}><span/><span/><span/></div>
+          <span>{privateUser} is typing</span>
+        </div>
+      )}
+
+      <div style={s.inputBar}>
         <input type="file" ref={privateFileInputRef} onChange={e => handleFileUpload(e, true)}
           accept="image/*,video/*,audio/*" style={{ display: 'none' }} />
-        <button style={styles.attachBtn} onClick={() => privateFileInputRef.current.click()} disabled={privateUploading}>
-          {privateUploading ? '⏳' : '📎'}
+        <button style={s.attachIconBtn} onClick={() => privateFileInputRef.current.click()} disabled={privateUploading}>
+          {privateUploading ? '⏳' : '⊕'}
         </button>
-        <input style={styles.messageInput} placeholder="Encrypted message..."
+        <input style={s.msgInput} placeholder="Encrypted message…"
           value={privateMessage} onChange={handlePrivateTyping}
           onKeyDown={e => e.key === 'Enter' && sendPrivateMessage()} />
-        <button style={privateMessage.trim() ? styles.sendBtn : styles.sendBtnDisabled}
-          onClick={sendPrivateMessage} disabled={!privateMessage.trim()}>🔒</button>
+        <button style={privateMessage.trim() ? s.sendBtn : s.sendBtnOff}
+          onClick={sendPrivateMessage} disabled={!privateMessage.trim()}>↑</button>
       </div>
     </div>
   );
 
-  // ─── MAIN CHAT ───
+  // ── GROUP CHAT ──
   return (
-    <div style={styles.chatContainer}>
+    <div style={s.appShell}>
       <style>{CSS}</style>
       {notification && (
-        <div style={styles.notificationBanner} onClick={() => { setScreen('users'); setNotification(''); }}>
-          {notification} — tap to view
+        <div style={s.toastBar} onClick={() => { setScreen('users'); setNotification(''); }}>
+          <span style={s.toastDot}>🔒</span>
+          {notification}
+          <span style={s.toastAction}>View →</span>
         </div>
       )}
-      <div style={styles.header}>
-        <div style={styles.headerLeft}>
-          <button style={styles.backBtn} onClick={leaveRoom}>←</button>
-          <span style={styles.headerIcon}>💬</span>
-          <div><h2 style={styles.headerTitle}>#{room}</h2><p style={styles.headerSub}>CloudChat</p></div>
+      <div style={s.appHeader}>
+        <div style={s.appHeaderLeft}>
+          <button style={s.iconBtn} onClick={leaveRoom}>←</button>
+          <div style={s.roomPill}>#{room}</div>
+          <div>
+            <div style={s.appTitle}>{room.charAt(0).toUpperCase() + room.slice(1)}</div>
+            <div style={s.appSubtitle}>
+              <span style={{color: connected ? '#00e5a0' : '#ff6b6b'}}>●</span>
+              {' '}{onlineUsers} online · 5min auto-delete
+            </div>
+          </div>
         </div>
-        <div style={styles.headerRight}>
-          <span style={connected ? styles.dotGreen : styles.dotRed}>●</span>
-          <button style={styles.privateBtn} onClick={() => { fetchConversations(username); setScreen('users'); }}>
-            🔐 {totalUnread > 0 && <span style={styles.unreadBadgeSmall}>{totalUnread}</span>}
+        <div style={s.appHeaderRight}>
+          <button style={s.dmBtn} onClick={() => { fetchConversations(username); setScreen('users'); }}>
+            DM {totalUnread > 0 && <span style={s.dmBadge}>{totalUnread}</span>}
           </button>
-          <button style={styles.logoutBtn2} onClick={handleLogout}>⏻</button>
+          <button style={s.iconBtn} onClick={handleLogout}>⏻</button>
         </div>
       </div>
-      <div style={styles.infoBar}>
-        <span>⚡ WS</span><span>🔴 Redis</span><span>🍃 MongoDB</span>
-        <span>🐳 Docker</span><span>🔐 JWT</span><span>🔒 E2E</span><span>📎 Media</span>
-        <span style={styles.onlineCount}>🟢 {onlineUsers}</span>
+
+      <div style={s.techStrip}>
+        {['⚡ WebSocket','🔴 Redis','🍃 MongoDB','🐳 Docker','🔐 JWT','🔒 E2E','📎 Media'].map(t => (
+          <span key={t} style={s.techTag}>{t}</span>
+        ))}
       </div>
-      <div style={styles.messagesContainer}>
+
+      <div style={s.msgArea}>
         {messages.length === 0 && (
-          <div style={styles.emptyState}>
-            <div style={styles.emptyIcon}>💬</div>
-            <p style={styles.emptyText}>No messages yet</p>
-            <p style={styles.emptySubtext}>Be the first to say hello!</p>
+          <div style={s.emptyState}>
+            <div style={s.emptyEmoji}>💬</div>
+            <div style={s.emptyTitle}>#{room} is quiet</div>
+            <div style={s.emptyDesc}>Be the first to say something</div>
           </div>
         )}
-        {messages.map((m, i) => (
-          <div key={i} style={m.username === username ? styles.myMessageWrapper : styles.otherMessageWrapper}>
-            {m.username !== username && (
-              <div style={{...styles.avatarSmall, position: 'relative'}} onClick={() => openPrivateChat(m.username)}>
-                {m.username.charAt(0).toUpperCase()}<OnlineDot isOnline={isOnline(m.username)} />
-              </div>
-            )}
-            <div style={styles.messageContent}>
-              {m.username !== username && (
-                <div style={styles.msgUsername} onClick={() => openPrivateChat(m.username)}>
-                  {m.username}
-                  <span style={{...styles.dmHint, color: isOnline(m.username) ? '#51cf66' : '#888'}}>
-                    {isOnline(m.username) ? ' ● online' : ' ○ offline'}
-                  </span>
+        {messages.map((m, i) => {
+          const mine = m.username === username;
+          return (
+            <div key={i} style={mine ? s.msgRowMine : s.msgRowTheirs}>
+              {!mine && (
+                <div style={{ position: 'relative', flexShrink: 0, cursor: 'pointer' }}
+                  onClick={() => openPrivateChat(m.username)}>
+                  <Avatar name={m.username} size={28} />
+                  <OnlineDot isOnline={isOnline(m.username)} />
                 </div>
               )}
-              <div style={m.username === username ? styles.myBubble : styles.otherBubble}>
-                {m.fileUrl ? renderMedia(m) : m.message}
+              <div style={s.msgBubbleWrap}>
+                {!mine && (
+                  <div style={s.senderRow}>
+                    <span style={s.senderName} onClick={() => openPrivateChat(m.username)}>{m.username}</span>
+                    <span style={{...s.onlineTag, color: isOnline(m.username) ? '#00e5a0' : 'rgba(255,255,255,0.25)'}}>
+                      {isOnline(m.username) ? '● online' : '○ offline'}
+                    </span>
+                  </div>
+                )}
+                <div style={mine ? s.bubbleMine : s.bubbleTheirs}>
+                  {m.fileUrl ? renderMedia(m) : m.message}
+                </div>
+                <div style={s.msgMeta}>
+                  {new Date(m.timestamp).toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'})}
+                  {m.expiresAt && <span style={s.expiryTag}> · 🔥 {new Date(m.expiresAt).toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'})}</span>}
+                </div>
               </div>
-              <div style={styles.msgTime}>
-                {new Date(m.timestamp).toLocaleTimeString()}
-                {m.expiresAt && <span style={styles.expiryText}> 🔥 {new Date(m.expiresAt).toLocaleTimeString()}</span>}
-              </div>
+              {mine && <Avatar name={username} size={28} gradient />}
             </div>
-            {m.username === username && <div style={styles.avatarMeSmall}>{username.charAt(0).toUpperCase()}</div>}
-          </div>
-        ))}
+          );
+        })}
         <div ref={bottomRef} />
       </div>
-      {typing && <div style={styles.typingIndicator}><span style={styles.typingDots}>•••</span> {typing}</div>}
-      <div style={styles.inputContainer}>
+
+      {typing && (
+        <div style={s.typingBar}>
+          <div style={s.typingDots}><span/><span/><span/></div>
+          <span>{typing}…</span>
+        </div>
+      )}
+
+      <div style={s.inputBar}>
         <input type="file" ref={fileInputRef} onChange={e => handleFileUpload(e, false)}
           accept="image/*,video/*,audio/*" style={{ display: 'none' }} />
-        <button style={styles.attachBtn} onClick={() => fileInputRef.current.click()} disabled={uploading}>
-          {uploading ? '⏳' : '📎'}
+        <button style={s.attachIconBtn} onClick={() => fileInputRef.current.click()} disabled={uploading}>
+          {uploading ? '⏳' : '⊕'}
         </button>
-        <input style={styles.messageInput} placeholder={`Message #${room}...`}
+        <input style={s.msgInput} placeholder={`Message #${room}…`}
           value={message} onChange={handleTyping}
           onKeyDown={e => e.key === 'Enter' && sendMessage()} />
-        <button style={message.trim() ? styles.sendBtn : styles.sendBtnDisabled}
-          onClick={sendMessage} disabled={!message.trim()}>➤</button>
+        <button style={message.trim() ? s.sendBtn : s.sendBtnOff}
+          onClick={sendMessage} disabled={!message.trim()}>↑</button>
       </div>
     </div>
   );
 }
 
+// ── GLOBAL CSS ──
 const CSS = `
-  * { box-sizing: border-box; }
-  body { margin: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; }
-  ::-webkit-scrollbar { width: 4px; }
+  @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700&family=DM+Mono:wght@400;500&display=swap');
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { margin: 0; font-family: 'DM Sans', sans-serif; background: #0a0a0f; color: #fff; -webkit-font-smoothing: antialiased; }
+  input, button, select, textarea { font-family: 'DM Sans', sans-serif; }
+  ::-webkit-scrollbar { width: 3px; }
   ::-webkit-scrollbar-track { background: transparent; }
-  ::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.15); border-radius: 4px; }
+  ::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.08); border-radius: 99px; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  @keyframes fadeUp { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+  @keyframes typingPulse { 0%,100% { opacity: 0.3; transform: scale(0.8); } 50% { opacity: 1; transform: scale(1); } }
+  @keyframes toastIn { from { opacity: 0; transform: translateY(-100%); } to { opacity: 1; transform: translateY(0); } }
+  .msg-enter { animation: fadeUp 0.2s ease; }
+  .typing-dot span { display: inline-block; width: 5px; height: 5px; border-radius: 50%; background: rgba(255,255,255,0.5); margin: 0 1.5px; animation: typingPulse 1.2s infinite; }
+  .typing-dot span:nth-child(2) { animation-delay: 0.2s; }
+  .typing-dot span:nth-child(3) { animation-delay: 0.4s; }
 `;
 
-const styles = {
-  authContainer: {
+// ── STYLES ──
+const s = {
+  // Auth
+  authBg: {
+    minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center',
+    background: '#0a0a0f', position: 'relative', overflow: 'hidden', padding: '16px',
+  },
+  authNoise: {
+    position: 'fixed', inset: 0, pointerEvents: 'none', zIndex: 0,
+    backgroundImage: `url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.03'/%3E%3C/svg%3E")`,
+    backgroundSize: '200px',
+  },
+  authGlow1: {
+    position: 'fixed', width: '500px', height: '500px', borderRadius: '50%',
+    background: 'radial-gradient(circle, rgba(255,107,53,0.08) 0%, transparent 70%)',
+    top: '-100px', right: '-100px', pointerEvents: 'none', zIndex: 0,
+  },
+  authGlow2: {
+    position: 'fixed', width: '400px', height: '400px', borderRadius: '50%',
+    background: 'radial-gradient(circle, rgba(0,229,160,0.06) 0%, transparent 70%)',
+    bottom: '-80px', left: '-80px', pointerEvents: 'none', zIndex: 0,
+  },
+  authCard: {
+    width: '100%', maxWidth: '400px', position: 'relative', zIndex: 1,
+    background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)',
+    borderRadius: '20px', padding: '36px 32px', display: 'flex', flexDirection: 'column', gap: '16px',
+    backdropFilter: 'blur(24px)',
+    boxShadow: '0 0 0 1px rgba(255,255,255,0.04) inset, 0 32px 64px rgba(0,0,0,0.4)',
+  },
+  logoMark: {
+    width: '48px', height: '48px', borderRadius: '14px', margin: '0 auto 12px',
+    background: 'linear-gradient(135deg, #ff6b35, #f7931e)',
     display: 'flex', alignItems: 'center', justifyContent: 'center',
-    minHeight: '100vh', background: 'linear-gradient(135deg, #0f0c29, #302b63, #24243e)', padding: '16px',
+    boxShadow: '0 8px 24px rgba(255,107,53,0.3)',
   },
-  authBox: {
-    background: 'rgba(255,255,255,0.05)', backdropFilter: 'blur(20px)',
-    border: '1px solid rgba(255,255,255,0.1)', borderRadius: '24px',
-    padding: '32px 24px', width: '100%', maxWidth: '420px',
-    display: 'flex', flexDirection: 'column', gap: '16px',
-    boxShadow: '0 32px 64px rgba(0,0,0,0.6)',
+  brandName: {
+    fontSize: '22px', fontWeight: '700', color: '#fff', letterSpacing: '-0.03em',
+    fontFamily: "'DM Sans', sans-serif",
   },
-  logoContainer: { display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '12px' },
-  logoIcon: { fontSize: '32px' },
-  logo: {
-    color: '#fff', margin: 0, fontSize: '28px', fontWeight: '800',
-    background: 'linear-gradient(135deg, #f5a623, #f0532a)',
-    WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent',
+  brandSub: { fontSize: '13px', color: 'rgba(255,255,255,0.4)', marginTop: '2px' },
+  errorPill: {
+    background: 'rgba(255,107,107,0.1)', border: '1px solid rgba(255,107,107,0.2)',
+    borderRadius: '10px', padding: '10px 14px', color: '#ff8a8a', fontSize: '13px',
   },
-  subtitle: { color: 'rgba(255,255,255,0.5)', textAlign: 'center', margin: 0, fontSize: '14px' },
-  errorBox: {
-    background: 'rgba(255,107,107,0.2)', border: '1px solid rgba(255,107,107,0.4)',
-    borderRadius: '8px', padding: '10px 14px', color: '#ff6b6b', fontSize: '13px',
-  },
-  inputGroup: { display: 'flex', flexDirection: 'column', gap: '6px' },
-  label: { color: 'rgba(255,255,255,0.6)', fontSize: '12px', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '1px' },
-  input: {
-    padding: '14px 16px', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.15)',
-    background: 'rgba(255,255,255,0.08)', color: '#fff', fontSize: '16px', outline: 'none', width: '100%',
-  },
-  select: {
-    padding: '14px 16px', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.15)',
-    background: '#1a1a3e', color: '#fff', fontSize: '16px', outline: 'none', width: '100%',
+  fieldGroup: { display: 'flex', flexDirection: 'column', gap: '6px' },
+  fieldLabel: { fontSize: '12px', fontWeight: '500', color: 'rgba(255,255,255,0.45)', letterSpacing: '0.03em' },
+  field: {
+    padding: '12px 14px', borderRadius: '12px', fontSize: '15px', color: '#fff', outline: 'none',
+    background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.08)',
+    transition: 'border-color 0.15s',
+    width: '100%',
   },
   primaryBtn: {
-    padding: '16px', background: 'linear-gradient(135deg, #f5a623, #f0532a)',
-    border: 'none', borderRadius: '12px', color: '#fff', fontSize: '16px',
-    fontWeight: 'bold', cursor: 'pointer', width: '100%',
+    padding: '13px', background: 'linear-gradient(135deg, #ff6b35, #f7931e)',
+    border: 'none', borderRadius: '12px', color: '#fff', fontSize: '15px', fontWeight: '600',
+    cursor: 'pointer', width: '100%', letterSpacing: '-0.01em',
+    boxShadow: '0 4px 16px rgba(255,107,53,0.3)',
   },
+  orRow: { display: 'flex', alignItems: 'center', gap: '12px' },
+  orLine: { flex: 1, height: '1px', background: 'rgba(255,255,255,0.07)' },
+  orText: { fontSize: '12px', color: 'rgba(255,255,255,0.3)' },
   googleBtn: {
-    padding: '14px', background: 'rgba(255,255,255,0.1)',
-    border: '1px solid rgba(255,255,255,0.2)', borderRadius: '12px',
-    color: '#fff', fontSize: '15px', cursor: 'pointer', width: '100%',
-    display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px',
+    padding: '12px', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.08)',
+    borderRadius: '12px', color: 'rgba(255,255,255,0.8)', fontSize: '14px', cursor: 'pointer',
+    width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px',
   },
-  googleIcon: {
-    background: '#fff', color: '#4285f4', width: '24px', height: '24px',
-    borderRadius: '50%', display: 'inline-flex', alignItems: 'center',
-    justifyContent: 'center', fontWeight: 'bold', fontSize: '14px',
+  switchRow: { fontSize: '13px', color: 'rgba(255,255,255,0.35)', textAlign: 'center' },
+  switchLink: { color: '#ff6b35', cursor: 'pointer', fontWeight: '500' },
+  spinner: { display: 'inline-block', animation: 'spin 0.8s linear infinite' },
+  backLink: {
+    background: 'none', border: 'none', color: 'rgba(255,255,255,0.4)', fontSize: '13px',
+    cursor: 'pointer', padding: '0', textAlign: 'left',
   },
-  divider: { display: 'flex', alignItems: 'center', gap: '12px', color: 'rgba(255,255,255,0.3)', fontSize: '13px' },
-  switchText: { color: 'rgba(255,255,255,0.4)', textAlign: 'center', fontSize: '13px', margin: 0 },
-  switchLink: { color: '#f5a623', cursor: 'pointer', fontWeight: '600' },
-  logoutBtn: {
-    padding: '12px', background: 'transparent',
-    border: '1px solid rgba(255,107,107,0.3)', borderRadius: '12px',
-    color: '#ff6b6b', fontSize: '14px', cursor: 'pointer', width: '100%',
-  },
+
+  // Home
+  homeGreeting: { fontSize: '14px', color: 'rgba(255,255,255,0.4)', marginTop: '4px' },
+  homeUsername: { color: '#ff6b35', fontWeight: '600' },
+  homeCardRow: { display: 'flex', flexDirection: 'column', gap: '10px' },
   homeCard: {
-    display: 'flex', alignItems: 'center', gap: '16px',
-    background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)',
-    borderRadius: '16px', padding: '18px 20px', cursor: 'pointer',
+    display: 'flex', alignItems: 'center', gap: '14px',
+    background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)',
+    borderRadius: '16px', padding: '16px', cursor: 'pointer',
+    transition: 'background 0.15s, border-color 0.15s',
   },
-  homeCardIcon: {
-    width: '52px', height: '52px', borderRadius: '14px', flexShrink: 0,
-    background: 'linear-gradient(135deg, #f5a623, #f0532a)',
-    display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '24px',
-  },
-  homeCardInfo: { flex: 1 },
-  homeCardTitle: { color: '#fff', fontSize: '16px', fontWeight: '700', display: 'flex', alignItems: 'center', gap: '8px' },
-  homeCardSub: { color: 'rgba(255,255,255,0.4)', fontSize: '12px', marginTop: '4px' },
-  homeCardArrow: { color: 'rgba(255,255,255,0.3)', fontSize: '20px' },
-  homeBadge: {
-    background: '#ff6b6b', color: '#fff', borderRadius: '10px',
-    padding: '2px 7px', fontSize: '11px', fontWeight: 'bold',
-  },
-  backBtnFull: {
-    background: 'transparent', border: 'none', color: '#f5a623',
-    fontSize: '14px', cursor: 'pointer', textAlign: 'left', padding: '0',
-  },
-  chatContainer: { display: 'flex', flexDirection: 'column', height: '100vh', background: '#0f0c29', overflow: 'hidden' },
-  header: {
-    background: 'linear-gradient(135deg, #302b63, #0f0c29)', padding: '10px 16px',
-    display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-    borderBottom: '1px solid rgba(255,255,255,0.08)', minHeight: '56px', flexShrink: 0,
-  },
-  headerLeft: { display: 'flex', alignItems: 'center', gap: '10px' },
-  headerIcon: { fontSize: '24px' },
-  headerTitle: { color: '#fff', margin: 0, fontSize: '16px', fontWeight: '700' },
-  headerSub: { color: 'rgba(255,255,255,0.4)', margin: 0, fontSize: '10px' },
-  headerRight: { display: 'flex', alignItems: 'center', gap: '8px' },
-  dotGreen: { color: '#51cf66', fontSize: '12px' },
-  dotRed: { color: '#ff6b6b', fontSize: '12px' },
-  userBadge: {
-    background: 'rgba(245,166,35,0.2)', border: '1px solid rgba(245,166,35,0.3)',
-    borderRadius: '20px', padding: '4px 10px', color: '#f5a623', fontSize: '12px', fontWeight: '600',
-  },
-  backBtn: {
-    background: 'transparent', border: 'none', color: '#f5a623',
-    fontSize: '20px', cursor: 'pointer', padding: '4px 8px',
-  },
-  privateBtn: {
-    background: 'rgba(81,207,102,0.2)', border: '1px solid rgba(81,207,102,0.3)',
-    borderRadius: '8px', padding: '6px 12px', color: '#51cf66', fontSize: '14px',
-    cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px',
-  },
-  unreadBadgeSmall: {
-    background: '#ff6b6b', color: '#fff', borderRadius: '10px',
-    padding: '1px 5px', fontSize: '10px', fontWeight: 'bold',
-  },
-  logoutBtn2: {
-    background: 'transparent', border: '1px solid rgba(255,255,255,0.2)',
-    borderRadius: '8px', padding: '6px 10px', color: 'rgba(255,255,255,0.5)',
-    fontSize: '14px', cursor: 'pointer',
-  },
-  privateBanner: {
-    background: 'rgba(81,207,102,0.1)', borderBottom: '1px solid rgba(81,207,102,0.2)',
-    padding: '6px 16px', fontSize: '11px', color: '#51cf66', textAlign: 'center', flexShrink: 0,
-  },
-  notificationBanner: {
-    background: 'linear-gradient(135deg, #51cf66, #2f9e44)', padding: '10px 16px',
-    fontSize: '13px', color: '#fff', textAlign: 'center', fontWeight: '600',
-    position: 'fixed', top: 0, left: 0, right: 0, zIndex: 1000, cursor: 'pointer',
-  },
-  infoBar: {
-    background: 'rgba(255,255,255,0.03)', borderBottom: '1px solid rgba(255,255,255,0.06)',
-    padding: '6px 16px', display: 'flex', gap: '12px', fontSize: '11px',
-    color: 'rgba(255,255,255,0.4)', overflowX: 'auto', flexShrink: 0,
-  },
-  onlineCount: { marginLeft: 'auto', color: '#51cf66', whiteSpace: 'nowrap' },
-  searchContainer: {
-    padding: '10px 16px', borderBottom: '1px solid rgba(255,255,255,0.06)',
-    background: 'rgba(255,255,255,0.02)', flexShrink: 0,
-  },
-  searchInput: {
-    width: '100%', padding: '10px 16px', borderRadius: '12px',
-    border: '1px solid rgba(255,255,255,0.15)', background: 'rgba(255,255,255,0.08)',
-    color: '#fff', fontSize: '15px', outline: 'none',
-  },
-  dmListContainer: { flex: 1, overflowY: 'auto', padding: '12px 16px' },
-  sectionTitle: {
-    color: 'rgba(255,255,255,0.35)', fontSize: '11px', fontWeight: '700',
-    textTransform: 'uppercase', letterSpacing: '1px', margin: '12px 0 8px 0',
-  },
-  noResults: { color: 'rgba(255,255,255,0.3)', fontSize: '14px', textAlign: 'center', padding: '20px 0' },
-  convCard: {
-    display: 'flex', alignItems: 'center', gap: '12px',
-    background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.07)',
-    borderRadius: '16px', padding: '12px 14px', cursor: 'pointer', marginBottom: '8px',
-  },
-  convCardUnread: { background: 'rgba(245,166,35,0.08)', border: '1px solid rgba(245,166,35,0.2)' },
-  convAvatar: {
-    width: '44px', height: '44px', borderRadius: '50%',
-    background: 'linear-gradient(135deg, #302b63, #24243e)',
-    border: '2px solid rgba(255,255,255,0.15)', display: 'flex',
-    alignItems: 'center', justifyContent: 'center', color: '#fff',
-    fontSize: '18px', fontWeight: 'bold', flexShrink: 0,
-  },
-  convInfo: { flex: 1, minWidth: 0 },
-  convHeader: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '3px' },
-  convName: { color: '#fff', fontSize: '14px', fontWeight: '600' },
-  convTime: { color: 'rgba(255,255,255,0.3)', fontSize: '11px', flexShrink: 0 },
-  convFooter: { display: 'flex', justifyContent: 'space-between', alignItems: 'center' },
-  convLastMsg: { color: 'rgba(255,255,255,0.4)', fontSize: '12px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 },
-  unreadBadge: {
-    background: '#f5a623', color: '#fff', borderRadius: '10px',
-    padding: '2px 7px', fontSize: '11px', fontWeight: 'bold', flexShrink: 0, marginLeft: '8px',
-  },
-  dmStartBtn: {
-    background: 'rgba(81,207,102,0.2)', border: '1px solid rgba(81,207,102,0.3)',
-    borderRadius: '8px', padding: '5px 10px', color: '#51cf66', fontSize: '12px', cursor: 'pointer', flexShrink: 0,
-  },
-  onlineStatusText: { fontSize: '10px', fontWeight: '600', flexShrink: 0 },
-  messagesContainer: { flex: 1, overflowY: 'auto', padding: '12px 16px', display: 'flex', flexDirection: 'column', gap: '10px' },
-  emptyState: { display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', flex: 1, gap: '8px', marginTop: '60px' },
-  emptyIcon: { fontSize: '48px', opacity: 0.3 },
-  emptyText: { color: 'rgba(255,255,255,0.3)', fontSize: '16px', margin: 0 },
-  emptySubtext: { color: 'rgba(255,255,255,0.2)', fontSize: '13px', margin: 0 },
-  myMessageWrapper: { display: 'flex', alignItems: 'flex-end', gap: '6px', justifyContent: 'flex-end' },
-  otherMessageWrapper: { display: 'flex', alignItems: 'flex-end', gap: '6px', justifyContent: 'flex-start' },
-  avatarSmall: {
-    width: '28px', height: '28px', borderRadius: '50%',
-    background: 'linear-gradient(135deg, #302b63, #24243e)',
-    border: '2px solid rgba(255,255,255,0.15)', display: 'flex',
-    alignItems: 'center', justifyContent: 'center', color: '#fff',
-    fontSize: '12px', fontWeight: 'bold', flexShrink: 0, cursor: 'pointer',
-  },
-  avatarMeSmall: {
-    width: '28px', height: '28px', borderRadius: '50%',
-    background: 'linear-gradient(135deg, #f5a623, #f0532a)',
+  homeCardIconWrap: {
+    width: '48px', height: '48px', borderRadius: '14px', flexShrink: 0,
+    background: 'linear-gradient(135deg, rgba(255,107,53,0.15), rgba(247,147,30,0.05))',
     display: 'flex', alignItems: 'center', justifyContent: 'center',
-    color: '#fff', fontSize: '12px', fontWeight: 'bold', flexShrink: 0,
   },
-  messageContent: { maxWidth: '75%' },
-  msgUsername: { color: '#f5a623', fontSize: '11px', marginBottom: '3px', fontWeight: '600', cursor: 'pointer' },
-  dmHint: { fontSize: '9px', marginLeft: '4px' },
-  myBubble: {
-    background: 'linear-gradient(135deg, #f5a623, #f0532a)', color: '#fff',
-    padding: '10px 14px', borderRadius: '18px 18px 4px 18px', fontSize: '14px', lineHeight: '1.5', wordBreak: 'break-word',
+  homeCardBody: { flex: 1 },
+  homeCardTitle: {
+    fontSize: '15px', fontWeight: '600', color: '#fff',
+    display: 'flex', alignItems: 'center', gap: '8px', letterSpacing: '-0.01em',
   },
-  otherBubble: {
-    background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.1)',
-    color: '#fff', padding: '10px 14px', borderRadius: '18px 18px 18px 4px', fontSize: '14px', lineHeight: '1.5', wordBreak: 'break-word',
+  homeCardMeta: { fontSize: '12px', color: 'rgba(255,255,255,0.35)', marginTop: '2px' },
+  homeCardChevron: { fontSize: '20px', color: 'rgba(255,255,255,0.2)', fontWeight: '300' },
+  unreadPill: {
+    background: '#00e5a0', color: '#0a0a0f', borderRadius: '99px',
+    padding: '1px 7px', fontSize: '11px', fontWeight: '700',
   },
-  msgTime: { color: 'rgba(255,255,255,0.25)', fontSize: '10px', marginTop: '3px', textAlign: 'right' },
-  expiryText: { color: '#ff6b6b', fontSize: '9px' },
-  typingIndicator: { color: 'rgba(255,255,255,0.4)', fontSize: '12px', padding: '4px 16px 6px', fontStyle: 'italic', flexShrink: 0 },
-  typingDots: { color: '#f5a623' },
-  inputContainer: {
-    display: 'flex', gap: '8px', padding: '10px 16px 16px',
-    borderTop: '1px solid rgba(255,255,255,0.08)',
-    background: 'rgba(255,255,255,0.02)', alignItems: 'center', flexShrink: 0,
+  signOutBtn: {
+    background: 'none', border: '1px solid rgba(255,255,255,0.07)', borderRadius: '12px',
+    color: 'rgba(255,255,255,0.35)', fontSize: '13px', cursor: 'pointer', padding: '10px',
+    width: '100%',
   },
-  messageInput: {
-    flex: 1, padding: '12px 16px', borderRadius: '25px',
-    border: '1px solid rgba(255,255,255,0.15)', background: 'rgba(255,255,255,0.08)',
-    color: '#fff', fontSize: '15px', outline: 'none',
+  techBadgeRow: { display: 'flex', flexWrap: 'wrap', gap: '6px', justifyContent: 'center' },
+  techBadge: {
+    background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.06)',
+    borderRadius: '99px', padding: '3px 10px', fontSize: '11px', color: 'rgba(255,255,255,0.3)',
   },
-  attachBtn: {
-    width: '44px', height: '44px', background: 'rgba(255,255,255,0.1)',
-    border: '1px solid rgba(255,255,255,0.2)', borderRadius: '50%',
-    color: '#fff', fontSize: '18px', cursor: 'pointer', flexShrink: 0,
+
+  // Room select
+  roomGrid: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' },
+  roomTile: {
+    background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)',
+    borderRadius: '14px', padding: '16px 14px', cursor: 'pointer', textAlign: 'center',
+    transition: 'all 0.15s',
+  },
+  roomTileActive: {
+    background: 'rgba(255,107,53,0.08)', border: '1px solid rgba(255,107,53,0.3)',
+    boxShadow: '0 0 16px rgba(255,107,53,0.1)',
+  },
+  roomEmoji: { fontSize: '24px', marginBottom: '6px' },
+  roomLabel: { fontSize: '14px', fontWeight: '600', color: '#fff', letterSpacing: '-0.01em' },
+  roomDesc: { fontSize: '11px', color: 'rgba(255,255,255,0.35)', marginTop: '2px' },
+
+  // App shell
+  appShell: {
+    display: 'flex', flexDirection: 'column', height: '100vh',
+    background: '#0a0a0f', overflow: 'hidden',
+  },
+  appHeader: {
+    display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+    padding: '12px 20px', borderBottom: '1px solid rgba(255,255,255,0.05)',
+    background: 'rgba(10,10,15,0.95)', backdropFilter: 'blur(20px)',
+    minHeight: '60px', flexShrink: 0, gap: '12px',
+  },
+  appHeaderLeft: { display: 'flex', alignItems: 'center', gap: '12px', flex: 1, minWidth: 0 },
+  appHeaderRight: { display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 },
+  appHeaderSub: { fontSize: '11px', color: 'rgba(255,255,255,0.3)', textAlign: 'center', flex: 1 },
+  appTitle: { fontSize: '15px', fontWeight: '600', color: '#fff', letterSpacing: '-0.02em', lineHeight: 1.2 },
+  appSubtitle: { fontSize: '11px', color: 'rgba(255,255,255,0.35)', marginTop: '1px' },
+  iconBtn: {
+    background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.07)',
+    borderRadius: '10px', color: 'rgba(255,255,255,0.6)', fontSize: '16px',
+    cursor: 'pointer', width: '36px', height: '36px', display: 'flex',
+    alignItems: 'center', justifyContent: 'center', flexShrink: 0,
+  },
+  avatarChip: {
+    width: '32px', height: '32px', borderRadius: '50%', flexShrink: 0,
+    background: 'linear-gradient(135deg, #ff6b35, #f7931e)',
+    display: 'flex', alignItems: 'center', justifyContent: 'center',
+    fontSize: '13px', fontWeight: '700', color: '#fff',
+  },
+
+  // Search
+  searchWrap: {
+    display: 'flex', alignItems: 'center', gap: '8px',
+    padding: '10px 20px', borderBottom: '1px solid rgba(255,255,255,0.05)',
+    background: 'rgba(255,255,255,0.01)',
+  },
+  searchIcon: { color: 'rgba(255,255,255,0.3)', fontSize: '20px', flexShrink: 0, lineHeight: 1 },
+  searchField: {
+    flex: 1, background: 'none', border: 'none', outline: 'none',
+    color: '#fff', fontSize: '14px', padding: '4px 0',
+  },
+  clearBtn: {
+    background: 'none', border: 'none', color: 'rgba(255,255,255,0.3)',
+    cursor: 'pointer', fontSize: '14px', padding: '4px',
+  },
+
+  // DM list
+  listArea: { flex: 1, overflowY: 'auto', padding: '8px 12px' },
+  listSection: {
+    fontSize: '11px', fontWeight: '600', color: 'rgba(255,255,255,0.25)',
+    textTransform: 'uppercase', letterSpacing: '0.08em',
+    padding: '12px 8px 6px',
+  },
+  dmRow: {
+    display: 'flex', alignItems: 'center', gap: '12px',
+    padding: '12px 10px', borderRadius: '14px', cursor: 'pointer',
+    transition: 'background 0.12s', marginBottom: '2px',
+  },
+  dmRowUnread: { background: 'rgba(0,229,160,0.04)' },
+  dmRowBody: { flex: 1, minWidth: 0 },
+  dmRowTop: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '3px' },
+  dmRowBottom: { display: 'flex', justifyContent: 'space-between', alignItems: 'center' },
+  dmRowName: { fontSize: '14px', fontWeight: '500', color: '#fff', letterSpacing: '-0.01em' },
+  dmRowMeta: { fontSize: '12px', color: 'rgba(255,255,255,0.35)' },
+  dmRowTime: { fontSize: '11px', color: 'rgba(255,255,255,0.25)', flexShrink: 0 },
+  dmRowPreview: { fontSize: '12px', color: 'rgba(255,255,255,0.35)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 },
+  dmRowAction: {
+    background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.08)',
+    borderRadius: '8px', padding: '5px 12px', fontSize: '12px', color: 'rgba(255,255,255,0.5)',
+    flexShrink: 0,
+  },
+  unreadCircle: {
+    background: '#00e5a0', color: '#0a0a0f', borderRadius: '99px',
+    minWidth: '20px', height: '20px', padding: '0 6px',
+    display: 'flex', alignItems: 'center', justifyContent: 'center',
+    fontSize: '11px', fontWeight: '700', flexShrink: 0, marginLeft: '8px',
+  },
+
+  // Empty states
+  emptyState: {
+    display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+    flex: 1, gap: '8px', padding: '60px 20px',
+  },
+  emptyEmoji: { fontSize: '40px', opacity: 0.3, marginBottom: '4px' },
+  emptyTitle: { fontSize: '16px', fontWeight: '600', color: 'rgba(255,255,255,0.4)' },
+  emptyDesc: { fontSize: '13px', color: 'rgba(255,255,255,0.2)', textAlign: 'center', maxWidth: '240px' },
+  emptyHint: { fontSize: '13px', color: 'rgba(255,255,255,0.25)', padding: '20px', textAlign: 'center' },
+
+  // E2E banner
+  e2eBanner: {
+    display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px',
+    padding: '7px 20px', fontSize: '11px', color: 'rgba(0,229,160,0.7)',
+    background: 'rgba(0,229,160,0.05)', borderBottom: '1px solid rgba(0,229,160,0.08)',
+    flexShrink: 0,
+  },
+  e2eBannerDot: { fontSize: '13px' },
+
+  // Tech strip
+  techStrip: {
+    display: 'flex', gap: '6px', padding: '8px 20px', overflowX: 'auto',
+    borderBottom: '1px solid rgba(255,255,255,0.04)', flexShrink: 0,
+  },
+  techTag: {
+    background: 'rgba(255,255,255,0.04)', borderRadius: '99px',
+    padding: '3px 10px', fontSize: '11px', color: 'rgba(255,255,255,0.25)', whiteSpace: 'nowrap',
+  },
+
+  // Messages
+  msgArea: {
+    flex: 1, overflowY: 'auto', padding: '16px 20px',
+    display: 'flex', flexDirection: 'column', gap: '8px',
+  },
+  msgRowMine: { display: 'flex', alignItems: 'flex-end', gap: '8px', justifyContent: 'flex-end' },
+  msgRowTheirs: { display: 'flex', alignItems: 'flex-end', gap: '8px', justifyContent: 'flex-start' },
+  msgBubbleWrap: { maxWidth: '72%', display: 'flex', flexDirection: 'column' },
+  senderRow: { display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '4px' },
+  senderName: {
+    fontSize: '12px', fontWeight: '600', color: '#ff6b35', cursor: 'pointer',
+  },
+  onlineTag: { fontSize: '10px' },
+  bubbleMine: {
+    background: 'linear-gradient(135deg, #ff6b35, #f7931e)',
+    color: '#fff', padding: '10px 14px',
+    borderRadius: '18px 18px 4px 18px', fontSize: '14px', lineHeight: '1.5',
+    wordBreak: 'break-word', letterSpacing: '-0.01em',
+  },
+  bubbleTheirs: {
+    background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(255,255,255,0.08)',
+    color: '#fff', padding: '10px 14px',
+    borderRadius: '18px 18px 18px 4px', fontSize: '14px', lineHeight: '1.5',
+    wordBreak: 'break-word', letterSpacing: '-0.01em',
+  },
+  msgMeta: {
+    fontSize: '10px', color: 'rgba(255,255,255,0.25)',
+    marginTop: '4px', display: 'flex', alignItems: 'center', gap: '4px',
+  },
+  expiryTag: { color: 'rgba(255,107,107,0.6)' },
+
+  // Typing
+  typingBar: {
+    display: 'flex', alignItems: 'center', gap: '8px',
+    padding: '6px 20px 2px', fontSize: '12px', color: 'rgba(255,255,255,0.3)',
+    flexShrink: 0,
+  },
+  typingDots: { display: 'flex', gap: '3px', className: 'typing-dot' },
+
+  // Input bar
+  inputBar: {
+    display: 'flex', alignItems: 'center', gap: '8px',
+    padding: '12px 16px 16px', borderTop: '1px solid rgba(255,255,255,0.05)',
+    background: 'rgba(10,10,15,0.95)', backdropFilter: 'blur(20px)', flexShrink: 0,
+  },
+  msgInput: {
+    flex: 1, background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.08)',
+    borderRadius: '14px', padding: '11px 16px', color: '#fff', fontSize: '14px',
+    outline: 'none', letterSpacing: '-0.01em',
+  },
+  attachIconBtn: {
+    width: '40px', height: '40px', borderRadius: '12px', flexShrink: 0,
+    background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.08)',
+    color: 'rgba(255,255,255,0.5)', fontSize: '20px', cursor: 'pointer',
     display: 'flex', alignItems: 'center', justifyContent: 'center',
   },
   sendBtn: {
-    width: '44px', height: '44px', background: 'linear-gradient(135deg, #f5a623, #f0532a)',
-    border: 'none', borderRadius: '50%', color: '#fff', fontWeight: 'bold',
-    cursor: 'pointer', fontSize: '16px', flexShrink: 0,
+    width: '40px', height: '40px', borderRadius: '12px', flexShrink: 0,
+    background: 'linear-gradient(135deg, #ff6b35, #f7931e)',
+    border: 'none', color: '#fff', fontSize: '18px', cursor: 'pointer',
+    display: 'flex', alignItems: 'center', justifyContent: 'center',
+    boxShadow: '0 4px 12px rgba(255,107,53,0.3)',
   },
-  sendBtnDisabled: {
-    width: '44px', height: '44px', background: 'rgba(255,255,255,0.1)',
-    border: 'none', borderRadius: '50%', color: 'rgba(255,255,255,0.3)',
-    cursor: 'not-allowed', fontSize: '16px', flexShrink: 0,
+  sendBtnOff: {
+    width: '40px', height: '40px', borderRadius: '12px', flexShrink: 0,
+    background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.06)',
+    color: 'rgba(255,255,255,0.2)', fontSize: '18px', cursor: 'not-allowed',
+    display: 'flex', alignItems: 'center', justifyContent: 'center',
   },
-  mediaImage: { maxWidth: '100%', maxHeight: '250px', borderRadius: '12px', cursor: 'pointer', display: 'block' },
-  mediaVideo: { maxWidth: '100%', maxHeight: '250px', borderRadius: '12px', display: 'block' },
-  mediaAudio: { width: '100%', borderRadius: '12px' },
-  fileLink: { color: '#f5a623', textDecoration: 'none', fontWeight: '600' },
+
+  // Group chat header extras
+  roomPill: {
+    background: 'rgba(255,107,53,0.1)', border: '1px solid rgba(255,107,53,0.2)',
+    borderRadius: '8px', padding: '4px 10px', fontSize: '12px', color: '#ff6b35',
+    fontWeight: '600', flexShrink: 0, fontFamily: "'DM Mono', monospace",
+  },
+  dmBtn: {
+    background: 'rgba(0,229,160,0.08)', border: '1px solid rgba(0,229,160,0.15)',
+    borderRadius: '10px', padding: '6px 12px', color: '#00e5a0', fontSize: '13px',
+    cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px', fontWeight: '500',
+  },
+  dmBadge: {
+    background: '#00e5a0', color: '#0a0a0f', borderRadius: '99px',
+    padding: '1px 6px', fontSize: '11px', fontWeight: '700',
+  },
+
+  // Toast
+  toastBar: {
+    display: 'flex', alignItems: 'center', gap: '10px',
+    padding: '12px 20px', background: 'rgba(0,229,160,0.9)',
+    color: '#0a0a0f', fontSize: '13px', fontWeight: '600', cursor: 'pointer',
+    position: 'fixed', top: 0, left: 0, right: 0, zIndex: 1000,
+    animation: 'toastIn 0.3s ease',
+  },
+  toastDot: { fontSize: '16px' },
+  toastAction: { marginLeft: 'auto', fontWeight: '700', opacity: 0.8 },
+
+  // Media
+  mediaImage: { maxWidth: '100%', maxHeight: '240px', borderRadius: '10px', cursor: 'pointer', display: 'block' },
+  mediaVideo: { maxWidth: '100%', maxHeight: '240px', borderRadius: '10px', display: 'block' },
+  mediaAudio: { width: '100%', borderRadius: '10px' },
+  fileLink: { color: '#ff6b35', textDecoration: 'none', fontWeight: '500', fontSize: '13px' },
 };
 
 export default App;
