@@ -55,7 +55,7 @@ mongoose.connect(MONGO)
   .catch(err => console.log('❌ MongoDB Error:', err.message));
 
 // ── OLD inline message schema (kept for backward compatibility) ──
-const MessageSchema = new mongoose.Schema({
+const ChatMessageSchema = new mongoose.Schema({
   room: String,
   username: String,
   message: String,
@@ -66,8 +66,8 @@ const MessageSchema = new mongoose.Schema({
   timestamp: { type: Date, default: Date.now },
   expiresAt: { type: Date, default: () => new Date(Date.now() + 5 * 60 * 1000) }
 });
-MessageSchema.index({ expiresAt: 1 }, { expireAfterSeconds: 0 });
-const Message = mongoose.model('Message', MessageSchema);
+ChatMessageSchema.index({ expiresAt: 1 }, { expireAfterSeconds: 0 });
+const Message = mongoose.model('ChatMessage', ChatMessageSchema);
 
 // ── NEW Message model (reactions, read receipts, reply, voice, search) ──
 const NewMessage = require('./models/Message');
