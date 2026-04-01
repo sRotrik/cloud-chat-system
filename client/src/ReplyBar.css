@@ -1,0 +1,57 @@
+/* ReplyBar.css */
+
+.reply-bar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: #f0f4f8;
+  border-top: 1px solid #e0e0e0;
+  padding: 8px 14px;
+  animation: slideUp .15s ease;
+}
+@keyframes slideUp { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+
+.rb-indicator {
+  width: 3px;
+  min-height: 36px;
+  background: #128C7E;
+  border-radius: 2px;
+  flex-shrink: 0;
+}
+
+.rb-content {
+  flex: 1;
+  overflow: hidden;
+}
+.rb-username {
+  display: block;
+  font-size: 12px;
+  font-weight: 700;
+  color: #128C7E;
+  margin-bottom: 2px;
+}
+.rb-text {
+  display: block;
+  font-size: 12px;
+  color: #666;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.rb-cancel {
+  background: none;
+  border: none;
+  font-size: 16px;
+  cursor: pointer;
+  color: #aaa;
+  padding: 4px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.rb-cancel:hover { background: rgba(0,0,0,.08); color: #555; }
+
+@media (prefers-color-scheme: dark) {
+  .reply-bar  { background: #1e2a31; border-color: #2a3942; }
+  .rb-text    { color: #aaa; }
+}

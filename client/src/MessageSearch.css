@@ -1,0 +1,105 @@
+/* MessageSearch.css */
+
+.search-toggle {
+  background: none;
+  border: none;
+  font-size: 20px;
+  cursor: pointer;
+  padding: 6px;
+  border-radius: 50%;
+  transition: background .15s;
+}
+.search-toggle:hover { background: rgba(255,255,255,.15); }
+
+/* ── Search panel overlay ────────────────────────────────── */
+.search-panel {
+  position: absolute;
+  top: 60px;
+  right: 0;
+  width: 340px;
+  max-height: 480px;
+  background: #fff;
+  border-radius: 0 0 12px 12px;
+  box-shadow: 0 8px 24px rgba(0,0,0,.18);
+  display: flex;
+  flex-direction: column;
+  z-index: 200;
+  overflow: hidden;
+  animation: slideDown .2s ease;
+}
+@keyframes slideDown { from { opacity: 0; transform: translateY(-12px); } to { opacity: 1; transform: none; } }
+
+/* ── Search bar ──────────────────────────────────────────── */
+.search-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 14px;
+  border-bottom: 1px solid #eee;
+}
+.search-icon  { font-size: 16px; color: #888; }
+.search-input {
+  flex: 1;
+  border: none;
+  outline: none;
+  font-size: 14px;
+  background: transparent;
+  color: #111;
+}
+.search-clear {
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: #aaa;
+  font-size: 14px;
+  padding: 2px 6px;
+  border-radius: 50%;
+}
+.search-clear:hover { background: #f0f0f0; color: #555; }
+
+/* ── Results list ────────────────────────────────────────── */
+.search-results { overflow-y: auto; flex: 1; }
+
+.search-status {
+  padding: 20px;
+  text-align: center;
+  color: #aaa;
+  font-size: 13px;
+}
+
+.search-result-item {
+  padding: 10px 14px;
+  border-bottom: 1px solid #f5f5f5;
+  cursor: pointer;
+  transition: background .12s;
+}
+.search-result-item:hover { background: #f9f9f9; }
+
+.sri-header {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 3px;
+}
+.sri-username { font-weight: 700; font-size: 13px; color: #128C7E; }
+.sri-time     { font-size: 11px; color: #aaa; }
+.sri-text     { font-size: 13px; color: #333; line-height: 1.4; }
+
+/* ── Highlight mark ──────────────────────────────────────── */
+mark.search-mark {
+  background: #fff59d;
+  color: #111;
+  border-radius: 2px;
+  padding: 0 1px;
+  font-weight: 600;
+}
+
+/* ── Dark mode ───────────────────────────────────────────── */
+@media (prefers-color-scheme: dark) {
+  .search-panel   { background: #1e2a31; }
+  .search-input   { color: #e9edef; }
+  .search-bar     { border-color: #2a3942; }
+  .search-result-item { border-color: #2a3942; }
+  .search-result-item:hover { background: #253038; }
+  .sri-text       { color: #ccc; }
+  mark.search-mark { background: #f9a825; color: #111; }
+}

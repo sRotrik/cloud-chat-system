@@ -1,0 +1,154 @@
+/* ============================================================
+   MessageBubble.css  —  WhatsApp-style chat bubbles
+   ============================================================ */
+
+/* ── Wrapper ─────────────────────────────────────────────── */
+.bubble-wrapper {
+  display: flex;
+  flex-direction: column;
+  margin: 4px 12px;
+  position: relative;
+  max-width: 70%;
+  user-select: none;
+}
+.bubble-wrapper.own   { align-self: flex-end;  align-items: flex-end; }
+.bubble-wrapper.other { align-self: flex-start; align-items: flex-start; }
+
+/* ── Bubble ──────────────────────────────────────────────── */
+.bubble {
+  padding: 8px 12px;
+  border-radius: 16px;
+  font-size: 14px;
+  line-height: 1.45;
+  box-shadow: 0 1px 2px rgba(0,0,0,.15);
+  position: relative;
+  min-width: 80px;
+  word-break: break-word;
+}
+.bubble-own   {
+  background: #dcf8c6;
+  border-bottom-right-radius: 4px;
+  color: #111;
+}
+.bubble-other {
+  background: #fff;
+  border-bottom-left-radius: 4px;
+  color: #111;
+}
+
+/* ── Username (other side only) ──────────────────────────── */
+.bubble-username {
+  font-size: 12px;
+  font-weight: 700;
+  color: #128C7E;
+  margin-bottom: 2px;
+}
+
+/* ── Text ────────────────────────────────────────────────── */
+.bubble-text { white-space: pre-wrap; }
+
+/* ── Meta row ────────────────────────────────────────────── */
+.bubble-meta {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  justify-content: flex-end;
+  margin-top: 4px;
+}
+.bubble-time { font-size: 11px; color: #999; }
+
+/* ── Read ticks ──────────────────────────────────────────── */
+.tick            { font-size: 13px; }
+.tick-sent       { color: #aaa; }
+.tick-delivered  { color: #aaa; }
+.tick-read       { color: #34b7f1; }
+
+/* ── Reply quote block ───────────────────────────────────── */
+.reply-quote {
+  background: rgba(0,0,0,.06);
+  border-left: 3px solid #128C7E;
+  border-radius: 8px 8px 0 0;
+  padding: 6px 10px;
+  font-size: 12px;
+  max-width: 100%;
+  overflow: hidden;
+}
+.reply-username { font-weight: 700; color: #128C7E; display: block; margin-bottom: 2px; }
+.reply-text     { color: #555; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: block; }
+
+/* ── Emoji picker popup ──────────────────────────────────── */
+.emoji-picker {
+  position: absolute;
+  bottom: calc(100% + 6px);
+  left: 0;
+  background: #fff;
+  border-radius: 24px;
+  box-shadow: 0 4px 16px rgba(0,0,0,.2);
+  display: flex;
+  gap: 2px;
+  padding: 6px 10px;
+  z-index: 100;
+  animation: popIn .15s ease;
+}
+@keyframes popIn {
+  from { transform: scale(.7); opacity: 0; }
+  to   { transform: scale(1);  opacity: 1; }
+}
+.emoji-btn, .reply-btn {
+  background: none;
+  border: none;
+  font-size: 22px;
+  cursor: pointer;
+  padding: 4px;
+  border-radius: 50%;
+  transition: background .15s;
+}
+.emoji-btn:hover, .reply-btn:hover { background: #f0f0f0; }
+.reply-btn { font-size: 18px; color: #555; }
+
+/* ── Reactions bar ───────────────────────────────────────── */
+.reactions-bar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 4px;
+}
+.reaction-chip {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  background: #f0f0f0;
+  border: 1.5px solid #ddd;
+  border-radius: 12px;
+  padding: 2px 8px;
+  font-size: 14px;
+  cursor: pointer;
+  transition: all .15s;
+}
+.reaction-chip.reacted {
+  background: #e3f2fd;
+  border-color: #90caf9;
+}
+.reaction-chip:hover { background: #e8e8e8; }
+.reaction-count { font-size: 12px; font-weight: 600; color: #555; }
+
+/* ── Voice player ────────────────────────────────────────── */
+.voice-player {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 220px;
+}
+.voice-player audio { flex: 1; height: 36px; }
+.voice-duration    { font-size: 11px; color: #888; white-space: nowrap; }
+
+/* ── Dark mode support ───────────────────────────────────── */
+@media (prefers-color-scheme: dark) {
+  .bubble-own   { background: #005c4b; color: #e9edef; }
+  .bubble-other { background: #202c33; color: #e9edef; }
+  .reply-quote  { background: rgba(255,255,255,.08); }
+  .emoji-picker { background: #2a3942; }
+  .reaction-chip { background: #2a3942; border-color: #3d5261; color: #e9edef; }
+  .reaction-chip.reacted { background: #1a3a4a; border-color: #4a8aac; }
+  .reaction-count { color: #aaa; }
+}

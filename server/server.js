@@ -7,6 +7,8 @@ const { createClient } = require('redis');
 const cors = require('cors');
 const path = require('path');
 const crypto = require('crypto');
+const { registerHandlers } = require('./socketHandlers');
+const voiceRoute = require('./routes/voice');
 
 require('dotenv').config({ path: path.join(__dirname, '.env') });
 
@@ -28,6 +30,7 @@ const mediaRoutes = require('./routes/media');
 app.use('/auth', authRoutes);
 app.use('/private', privateRoutes);
 app.use('/media', mediaRoutes);
+app.use('/api/voice', voiceRoute);  // ← voice upload route (already added)
 
 const server = http.createServer(app);
 const io = new Server(server, {
@@ -51,6 +54,7 @@ mongoose.connect(MONGO)
   .then(() => console.log('✅ MongoDB Connected'))
   .catch(err => console.log('❌ MongoDB Error:', err.message));
 
+// ── OLD inline message schema (kept for backward compatibility) ──
 const MessageSchema = new mongoose.Schema({
   room: String,
   username: String,
@@ -65,6 +69,9 @@ const MessageSchema = new mongoose.Schema({
 MessageSchema.index({ expiresAt: 1 }, { expireAfterSeconds: 0 });
 const Message = mongoose.model('Message', MessageSchema);
 
+// ── NEW Message model (reactions, read receipts, reply, voice, search) ──
+const NewMessage = require('./models/Message');
+
 const PrivateMessage = require('./models/PrivateMessage');
 const Conversation = require('./models/Conversation');
 
@@ -73,19 +80,31 @@ const onlineUsers = new Map();
 io.on('connection', (socket) => {
   console.log('✅ User connected:', socket.id);
 
+  // ── NEW: Register all new feature handlers (reactions, read receipts, etc.) ──
+  registerHandlers(socket, io);
+
   socket.on('register_user', (username) => {
     onlineUsers.set(username, socket.id);
+    socket.data = { ...socket.data, username };  // ← store username for socketHandlers
     console.log(`👤 ${username} registered with socket ${socket.id}`);
     io.emit('online_users_list', Array.from(onlineUsers.keys()));
-    // Send current online list to this specific user
     socket.emit('online_users_list', Array.from(onlineUsers.keys()));
   });
 
   socket.on('join_room', async (room) => {
     socket.join(room);
+    socket.data = { ...socket.data, room };  // ← store room for socketHandlers
+
+    // Old message history (existing chat)
     const history = await Message.find({ room })
       .sort('-timestamp').limit(50);
     socket.emit('message_history', history.reverse());
+
+    // NEW: Also send new-format message history
+    const newHistory = await NewMessage.find({ room })
+      .sort({ createdAt: -1 }).limit(50).lean();
+    socket.emit('messageHistory', newHistory.reverse());
+
     io.to(room).emit('online_count',
       io.sockets.adapter.rooms.get(room)?.size || 0);
   });
@@ -95,14 +114,14 @@ io.on('connection', (socket) => {
     const msg = new Message({ ...data, expiresAt });
     await msg.save();
     io.to(data.room).emit('receive_message', {
-      username: data.username,
-      message: data.message,
-      fileUrl: data.fileUrl,
-      fileId: data.fileId,
-      mimetype: data.mimetype,
+      username:     data.username,
+      message:      data.message,
+      fileUrl:      data.fileUrl,
+      fileId:       data.fileId,
+      mimetype:     data.mimetype,
       originalName: data.originalName,
-      timestamp: msg.timestamp,
-      expiresAt: msg.expiresAt,
+      timestamp:    msg.timestamp,
+      expiresAt:    msg.expiresAt,
     });
   });
 
@@ -148,18 +167,16 @@ io.on('connection', (socket) => {
 
     socket.join(`private_${roomId}`);
 
-    // ⚡ Broadcast INSTANTLY
     io.to(`private_${roomId}`).emit('receive_private', {
       from, to, message, timestamp, expiresAt,
       fileUrl, mimetype, originalName,
     });
-    // Notify receiver instantly
+
     const receiverSocketId = onlineUsers.get(to);
     if (receiverSocketId) {
       io.to(receiverSocketId).emit('private_notification', { from, message });
     }
 
-    // Save to DB in background
     setImmediate(async () => {
       try {
         const iv = crypto.randomBytes(16);
@@ -171,7 +188,6 @@ io.on('connection', (socket) => {
         const msg = new PrivateMessage({ from, to, encryptedMessage, roomId, expiresAt, fileUrl, mimetype, originalName });
         await msg.save();
 
-        // Find existing or create new conversation
         let conv = await Conversation.findOne({ participants: { $all: [from, to] } });
         if (!conv) {
           conv = new Conversation({
@@ -192,7 +208,6 @@ io.on('connection', (socket) => {
           await conv.save();
         }
 
-        // Notify receiver to refresh their conversation list
         const receiverSockId = onlineUsers.get(to);
         if (receiverSockId) {
           io.to(receiverSockId).emit('refresh_conversations');
@@ -208,19 +223,16 @@ io.on('connection', (socket) => {
     const readTime = new Date();
     const newExpiry = new Date(readTime.getTime() + 5 * 60 * 1000);
 
-    // Reset unread count
     await Conversation.findOneAndUpdate(
       { participants: { $all: [from, to] } },
       { $set: { [`unreadCount.${from}`]: 0 } }
     );
 
-    // Update expiry of all unread messages from this conversation
     await PrivateMessage.updateMany(
       { roomId, to: from },
       { $set: { expiresAt: newExpiry } }
     );
 
-    // Notify both users of updated expiry
     io.to(`private_${roomId}`).emit('messages_expiry_updated', {
       roomId, newExpiry
     });
