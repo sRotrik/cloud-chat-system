@@ -427,6 +427,17 @@ function App() {
             )}
           </div>
           
+          {!isPrivate && m.reactions && Object.keys(m.reactions).length > 0 && (
+            <div style={{display:'flex', flexWrap:'wrap', gap:'2px', position:'absolute', bottom:'-10px', [mine ? 'left' : 'right']:'10px', zIndex:5}}>
+              {Object.entries(m.reactions).map(([emoji, reaction]) => reaction && reaction.count > 0 && (
+                <div key={emoji} style={{display:'flex', alignItems:'center', gap:'2px', background: reaction.users?.includes(username) ? '#e3f2fd' : '#f0f0f0', border:`1.5px solid ${reaction.users?.includes(username) ? '#90caf9' : '#fff'}`, borderRadius:'12px', padding:'2px 5px', fontSize:'11px', cursor:'pointer', boxShadow:'0 1px 2px rgba(0,0,0,0.1)'}} onClick={(e) => { e.stopPropagation(); if(onReact) onReact({messageId: m._id, emoji}); }}>
+                  <span>{emoji}</span>
+                  <span style={{fontSize:'10px', fontWeight:600, color:'#555'}}>{reaction.count}</span>
+                </div>
+              ))}
+            </div>
+          )}
+
           {showMenu && (
             <div className="context-menu" style={{position: 'absolute', top: '50%', transform:'translateY(-50%)', [mine ? 'right' : 'left']: '105%', minWidth:'150px', zIndex: 10, background: '#1a1a20', padding: '8px', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.1)'}} onMouseLeave={() => setShowMenu(false)}>
               {!isPrivate && (
