@@ -120,6 +120,28 @@ function registerHandlers(socket, io) {
     }
   });
 
+  // ── Delete message ──
+  socket.on('deleteMessage', async ({ messageId, room, username, forEveryone }) => {
+    try {
+      if (!forEveryone) return; // Handled locally on client
+      
+      const msg = await Message.findById(messageId);
+      if (!msg) return socket.emit('error', { message: 'Message not found' });
+      
+      // Allow only the sender to delete for everyone
+      if (msg.username !== username) {
+        return socket.emit('error', { message: 'Not authorized to delete' });
+      }
+
+      await Message.findByIdAndDelete(messageId);
+      await pub(io, room, 'messageDeleted', { messageId, forEveryone: true });
+
+    } catch (err) {
+      socket.emit('error', { message: 'Failed to delete message' });
+      console.error('[deleteMessage]', err);
+    }
+  });
+
   // ── Search messages ──
   socket.on('searchMessages', async ({ room, query }) => {
     try {

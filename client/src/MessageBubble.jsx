@@ -8,21 +8,26 @@ import './MessageBubble.css';
 
 const EMOJI_LIST = ['👍', '❤️', '😂', '😮', '😢', '🔥'];
 
-export default function MessageBubble({ msg, currentUser, onReact, onReply }) {
-  const [showEmojiPicker, setShowEmojiPicker] = useState(false);
+export default function MessageBubble({ msg, currentUser, onReact, onReply, onDelete, onForward }) {
+  const [showContextMenu, setShowContextMenu] = useState(false);
   const holdTimer = useRef(null);
 
-  const isOwn = msg.username === currentUser;
+  const isOwn = msg.username === currentUser || msg.from === currentUser;
 
-  // ── Long-press / right-click to show emoji picker ─────────
+  // ── Long-press / right-click to show context menu ─────────
   const handleMouseDown = () => {
-    holdTimer.current = setTimeout(() => setShowEmojiPicker(true), 500);
+    holdTimer.current = setTimeout(() => setShowContextMenu(true), 500);
   };
   const handleMouseUp = () => clearTimeout(holdTimer.current);
 
   const handleReact = (emoji) => {
-    onReact({ messageId: msg._id, emoji });
-    setShowEmojiPicker(false);
+    if (onReact) onReact({ messageId: msg._id, emoji });
+    setShowContextMenu(false);
+  };
+
+  const handleCopy = () => {
+    navigator.clipboard.writeText(msg.text || msg.message || '');
+    setShowContextMenu(false);
   };
 
   // ── Read receipt tick rendering ────────────────────────────
@@ -63,7 +68,7 @@ export default function MessageBubble({ msg, currentUser, onReact, onReply }) {
       onMouseUp={handleMouseUp}
       onTouchStart={handleMouseDown}
       onTouchEnd={handleMouseUp}
-      onContextMenu={(e) => { e.preventDefault(); setShowEmojiPicker(true); }}
+      onContextMenu={(e) => { e.preventDefault(); setShowContextMenu(true); }}
     >
       {/* ── Reply quote block ─────────────────────────────── */}
       {msg.replyTo && (
@@ -89,17 +94,21 @@ export default function MessageBubble({ msg, currentUser, onReact, onReply }) {
         </div>
       </div>
 
-      {/* ── Emoji Picker ─────────────────────────────────── */}
-      {showEmojiPicker && (
-        <div className="emoji-picker" onMouseLeave={() => setShowEmojiPicker(false)}>
-          {EMOJI_LIST.map(e => (
-            <button key={e} className="emoji-btn" onClick={() => handleReact(e)}>{e}</button>
-          ))}
-          <button
-            className="reply-btn"
-            onClick={() => { onReply(msg); setShowEmojiPicker(false); }}
-            title="Reply"
-          >↩</button>
+      {/* ── Context Menu ─────────────────────────────────── */}
+      {showContextMenu && (
+        <div className="context-menu" onMouseLeave={() => setShowContextMenu(false)}>
+          <div className="emoji-row">
+            {EMOJI_LIST.map(e => (
+              <button key={e} className="emoji-btn" onClick={() => handleReact(e)}>{e}</button>
+            ))}
+          </div>
+          <div className="menu-actions">
+            <button className="menu-action-btn" onClick={() => { if(onReply) onReply(msg); setShowContextMenu(false); }}>↩ Reply</button>
+            <button className="menu-action-btn" onClick={() => { if(onForward) onForward(msg); setShowContextMenu(false); }}>➡ Forward</button>
+            <button className="menu-action-btn" onClick={handleCopy}>📋 Copy</button>
+            {isOwn && <button className="menu-action-btn del-everyone" onClick={() => { if(onDelete) onDelete(msg._id, true); setShowContextMenu(false); }}>🗑 Delete for everyone</button>}
+            <button className="menu-action-btn del-me" onClick={() => { if(onDelete) onDelete(msg._id, false); setShowContextMenu(false); }}>🗑 Delete for me</button>
+          </div>
         </div>
       )}
 

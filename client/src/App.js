@@ -203,6 +203,12 @@ function App() {
           : m
       ));
     });
+    socket.on('messageDeleted', ({ messageId, forEveryone }) => {
+      if (forEveryone) {
+        setMessages(prev => prev.filter(m => String(m._id) !== String(messageId)));
+        setPrivateMessages(prev => prev.filter(m => String(m._id) !== String(messageId)));
+      }
+    });
 
     socket.on('user_typing', (user) => { setTyping(`${user} is typing`); setTimeout(() => setTyping(''), 2000); });
     socket.on('private_history', (history) => setPrivateMessages(history));
@@ -263,6 +269,21 @@ function App() {
       setReplyTo(null);
     }
   };
+
+  const handleDeleteMessage = useCallback((messageId, forEveryone) => {
+    if (!forEveryone) {
+      setMessages(prev => prev.filter(m => String(m._id) !== String(messageId)));
+      setPrivateMessages(prev => prev.filter(m => String(m._id) !== String(messageId)));
+      return;
+    }
+    if (socketRef.current) {
+      socketRef.current.emit('deleteMessage', { messageId, room, username, forEveryone });
+    }
+  }, [room, username]);
+
+  const handleForwardMessage = useCallback((msg) => {
+    setMessage(`[Forwarded]\n${msg.text || msg.message || 'Voice/Media file'}`);
+  }, []);
 
   const handleReact = useCallback(({ messageId, emoji }) => {
     if (socketRef.current) {
@@ -751,6 +772,8 @@ function App() {
                   currentUser={username}
                   onReact={handleReact}
                   onReply={setReplyTo}
+                  onDelete={handleDeleteMessage}
+                  onForward={handleForwardMessage}
                 />
               </div>
             );
