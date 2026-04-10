@@ -104,7 +104,8 @@ export default function VoiceRecorder({ room, username, onSend, onCancel }) {
       formData.append('room', room);
       formData.append('duration', duration);
 
-      const res  = await fetch('/api/voice/upload', { method: 'POST', body: formData });
+      const SERVER = process.env.REACT_APP_SERVER_URL || 'http://localhost:3001';
+      const res  = await fetch(`${SERVER}/api/voice/upload`, { method: 'POST', body: formData });
       const data = await res.json();
 
       if (data.success) {

@@ -43,10 +43,11 @@ router.post('/upload', upload.single('audio'), async (req, res) => {
     uploadStream.end(req.file.buffer);
 
     uploadStream.on('finish', () => {
+      const baseUrl = process.env.SERVER_BASE_URL || `${req.protocol}://${req.get('host')}`;
       res.json({
         success:  true,
         fileId:   uploadStream.id,
-        url:      `/api/voice/stream/${uploadStream.id}`,
+        url:      `${baseUrl}/api/voice/stream/${uploadStream.id}`,
         filename,
         duration: req.body.duration || 0
       });
