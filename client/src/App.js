@@ -81,6 +81,13 @@ function App() {
       setToken(googleToken); setUsername(googleUsername); setScreen('home');
       window.history.replaceState({}, '', '/');
     }
+    
+    // Auto refresh the page every 3 minutes
+    const autoRefreshTimer = setInterval(() => {
+      window.location.reload();
+    }, 3 * 60 * 1000);
+
+    return () => clearInterval(autoRefreshTimer);
   }, []);
 
   useEffect(() => {
