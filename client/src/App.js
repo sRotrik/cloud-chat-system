@@ -270,14 +270,15 @@ function App() {
     }
   };
 
-  const handleDeleteMessage = useCallback((messageId, forEveryone) => {
+  const handleDeleteMessage = useCallback((messageId, forEveryone, isPrivateMsg = false, privUser = '') => {
     if (!forEveryone) {
       setMessages(prev => prev.filter(m => String(m._id) !== String(messageId)));
       setPrivateMessages(prev => prev.filter(m => String(m._id) !== String(messageId)));
       return;
     }
     if (socketRef.current) {
-      socketRef.current.emit('deleteMessage', { messageId, room, username, forEveryone });
+      const privateRoomId = isPrivateMsg ? [username, privUser].sort().join('_') : null;
+      socketRef.current.emit('deleteMessage', { messageId, room, username, forEveryone, isPrivate: isPrivateMsg, privateRoomId });
     }
   }, [room, username]);
 
@@ -393,7 +394,7 @@ function App() {
   const totalUnread = conversations.reduce((acc, c) => acc + getUnreadCount(c), 0);
   const isOnline = (uname) => onlineUsersList.includes(uname);
 
-  const InteractiveRawMessage = ({ m, mine, s, isPrivate, renderMedia, openPrivateChat, isOnline, onDelete, onForward, username }) => {
+  const InteractiveRawMessage = ({ m, mine, s, isPrivate, renderMedia, openPrivateChat, isOnline, onDelete, onForward, onReact, username }) => {
     const [showMenu, setShowMenu] = useState(false);
     const holdTimer = useRef(null);
 
@@ -428,6 +429,13 @@ function App() {
           
           {showMenu && (
             <div className="context-menu" style={{position: 'absolute', top: '50%', transform:'translateY(-50%)', [mine ? 'right' : 'left']: '105%', minWidth:'150px', zIndex: 10, background: '#1a1a20', padding: '8px', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.1)'}} onMouseLeave={() => setShowMenu(false)}>
+              {!isPrivate && (
+                <div style={{display:'flex', gap:'4px', marginBottom:'8px', paddingBottom:'8px', borderBottom:'1px solid rgba(255,255,255,0.1)', justifyContent:'center'}}>
+                  {['👍', '❤️', '😂', '😮', '😢', '🔥'].map(e => (
+                    <button key={e} style={{background:'none', border:'none', fontSize:'18px', cursor:'pointer'}} onClick={() => { if(onReact) onReact({messageId: m._id, emoji: e}); setShowMenu(false); }}>{e}</button>
+                  ))}
+                </div>
+              )}
               <div className="menu-actions" style={{display: 'flex', flexDirection: 'column', gap: '4px'}}>
                 <button style={{background: 'none', border: 'none', color: '#fff', textAlign: 'left', cursor: 'pointer', fontSize: '13px'}} onClick={() => { if(onForward) onForward(m); setShowMenu(false); }}>➡ Forward</button>
                 <button style={{background: 'none', border: 'none', color: '#fff', textAlign: 'left', cursor: 'pointer', fontSize: '13px'}} onClick={() => { navigator.clipboard.writeText(m.message || m.text || ''); setShowMenu(false); }}>📋 Copy</button>
@@ -722,7 +730,8 @@ function App() {
             <InteractiveRawMessage 
               key={m._id || i} m={m} mine={mine} s={s} 
               isPrivate={true} renderMedia={renderMedia} 
-              onDelete={handleDeleteMessage} onForward={handleForwardMessage}
+              onDelete={(id, forEveryone) => handleDeleteMessage(id, forEveryone, true, privateUser)} 
+              onForward={handleForwardMessage}
               username={username}
             />
           );
@@ -825,7 +834,8 @@ function App() {
               key={m._id || i} m={m} mine={mine} s={s} 
               isPrivate={false} renderMedia={renderMedia} 
               openPrivateChat={openPrivateChat} isOnline={isOnline}
-              onDelete={handleDeleteMessage} onForward={handleForwardMessage}
+              onDelete={(id, forEveryone) => handleDeleteMessage(id, forEveryone, false)}
+              onForward={handleForwardMessage} onReact={handleReact}
               username={username}
             />
           );

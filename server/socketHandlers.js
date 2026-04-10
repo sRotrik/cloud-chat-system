@@ -1,4 +1,5 @@
 const Message = require('./models/Message');
+const PrivateMessage = require('./models/PrivateMessage');
 
 async function pub(io, room, event, payload) {
   io.to(room).emit(event, payload);
@@ -121,20 +122,22 @@ function registerHandlers(socket, io) {
   });
 
   // ── Delete message ──
-  socket.on('deleteMessage', async ({ messageId, room, username, forEveryone }) => {
+  socket.on('deleteMessage', async ({ messageId, room, username, forEveryone, isPrivate, privateRoomId }) => {
     try {
-      if (!forEveryone) return; // Handled locally on client
+      if (!forEveryone) return;
       
-      const msg = await Message.findById(messageId);
+      const Model = isPrivate ? PrivateMessage : Message;
+      const msg = await Model.findById(messageId);
+      
       if (!msg) return socket.emit('error', { message: 'Message not found' });
       
-      // Allow only the sender to delete for everyone
-      if (msg.username !== username) {
+      const senderField = isPrivate ? msg.from : msg.username;
+      if (senderField !== username) {
         return socket.emit('error', { message: 'Not authorized to delete' });
       }
 
-      await Message.findByIdAndDelete(messageId);
-      await pub(io, room, 'messageDeleted', { messageId, forEveryone: true });
+      await Model.findByIdAndDelete(messageId);
+      await pub(io, isPrivate ? privateRoomId : room, 'messageDeleted', { messageId, forEveryone: true });
 
     } catch (err) {
       socket.emit('error', { message: 'Failed to delete message' });

@@ -129,15 +129,15 @@ socket.on('join_private', async ({ from, to }) => {
   
   const decrypted = messages.map(msg => {
     try {
-      if (!msg.encryptedMessage) return { from: msg.from, to: msg.to, message: '', fileUrl: msg.fileUrl, mimetype: msg.mimetype, originalName: msg.originalName, timestamp: msg.timestamp, expiresAt: msg.expiresAt };
+      if (!msg.encryptedMessage) return { _id: msg._id, from: msg.from, to: msg.to, message: '', fileUrl: msg.fileUrl, mimetype: msg.mimetype, originalName: msg.originalName, timestamp: msg.timestamp, expiresAt: msg.expiresAt };
       const [ivHex, encrypted] = msg.encryptedMessage.split(':');
       const iv = Buffer.from(ivHex, 'hex');
       const decipher = crypto.createDecipheriv('aes-256-cbc', Buffer.from(key), iv);
       let text = decipher.update(encrypted, 'hex', 'utf8');
       text += decipher.final('utf8');
-      return { from: msg.from, to: msg.to, message: text, timestamp: msg.timestamp, expiresAt: msg.expiresAt, fileUrl: msg.fileUrl, mimetype: msg.mimetype, originalName: msg.originalName };
+      return { _id: msg._id, from: msg.from, to: msg.to, message: text, timestamp: msg.timestamp, expiresAt: msg.expiresAt, fileUrl: msg.fileUrl, mimetype: msg.mimetype, originalName: msg.originalName };
     } catch {
-      return { from: msg.from, to: msg.to, message: '[Encrypted]', timestamp: msg.timestamp };
+      return { _id: msg._id, from: msg.from, to: msg.to, message: '[Encrypted]', timestamp: msg.timestamp };
     }
   }).reverse();
 
@@ -181,6 +181,7 @@ socket.on('send_private', async (data) => {
   );
 
   const payload = {
+    _id: msg._id,
     from, to, message, 
     fileUrl, fileId, mimetype, originalName,
     timestamp: msg.timestamp, expiresAt
