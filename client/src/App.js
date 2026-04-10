@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import io from 'socket.io-client';
 import MessageBubble from './MessageBubble';
 import VoiceRecorder from './VoiceRecorder';
+import VoicePlayer from './VoicePlayer';
 import MessageSearch from './MessageSearch';
 import ReplyBar from './ReplyBar';
 
@@ -314,6 +315,20 @@ function App() {
     }
   }, [room, username, replyTo]);
 
+  const sendPrivateVoice = useCallback(({ voiceUrl, voiceDuration, waveform }) => {
+    if (socketRef.current) {
+      const payload = {
+        message: '', type: 'voice', voiceUrl, voiceDuration, waveform
+      };
+      setPrivateMessages(prev => [...prev, {
+        from: username, to: privateUser, ...payload,
+        timestamp: new Date(), expiresAt: new Date(Date.now() + 5 * 60 * 1000), temp: true
+      }]);
+      socketRef.current.emit('send_private', { from: username, to: privateUser, ...payload });
+      setTimeout(() => fetchConversations(username), 1000);
+    }
+  }, [username, privateUser]);
+
   const jumpToMessage = useCallback((id) => {
     const el = msgRefs.current[id];
     if (el) {
@@ -425,7 +440,7 @@ function App() {
         <div style={{...s.msgBubbleWrap, position: 'relative'}}>
           {!mine && !isPrivate && <div onClick={() => openPrivateChat && openPrivateChat(m.username)} style={{fontSize:'12px',color:'#ccc',cursor:'pointer',marginBottom:'2px'}}>{m.username}</div>}
           <div style={{...(mine ? s.bubbleMine : s.bubbleTheirs), opacity: m.temp ? 0.6 : 1}}>
-            {m.fileUrl ? renderMedia(m) : (m.message || m.text)}
+            {m.type === 'voice' ? <VoicePlayer msg={m} isOwn={mine} /> : (m.fileUrl ? renderMedia(m) : (m.message || m.text))}
           </div>
           <div style={s.msgMeta}>
             {m.temp ? '⏳ Sending…' : new Date(m.timestamp || m.createdAt).toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'})}
@@ -771,8 +786,11 @@ function App() {
         <input style={s.msgInput} placeholder="Encrypted message…"
           value={privateMessage} onChange={handlePrivateTyping}
           onKeyDown={e => e.key === 'Enter' && sendPrivateMessage()} />
-        <button style={privateMessage.trim() ? s.sendBtn : s.sendBtnOff}
-          onClick={sendPrivateMessage} disabled={!privateMessage.trim()}>↑</button>
+        {privateMessage.trim() ? (
+          <button style={s.sendBtn} onClick={sendPrivateMessage} disabled={!privateMessage.trim()}>↑</button>
+        ) : (
+          <VoiceRecorder username={username} onSend={sendPrivateVoice} />
+        )}
       </div>
     </div>
   );
@@ -873,20 +891,17 @@ function App() {
       <div style={s.inputBar}>
         <input type="file" ref={fileInputRef} onChange={e => handleFileUpload(e, false)}
           accept="image/*,video/*,audio/*" style={{ display: 'none' }} />
-        <VoiceRecorder
-          room={room}
-          username={username}
-          onSend={sendVoice}
-          onCancel={() => {}}
-        />
         <button style={s.attachIconBtn} onClick={() => fileInputRef.current.click()} disabled={uploading}>
           {uploading ? '⏳' : '⊕'}
         </button>
         <input style={s.msgInput} placeholder={`Message #${room}…`}
           value={message} onChange={handleTyping}
           onKeyDown={e => e.key === 'Enter' && sendMessageWithReply()} />
-        <button style={message.trim() ? s.sendBtn : s.sendBtnOff}
-          onClick={sendMessageWithReply} disabled={!message.trim()}>↑</button>
+        {message.trim() ? (
+          <button style={s.sendBtn} onClick={sendMessageWithReply} disabled={!message.trim()}>↑</button>
+        ) : (
+          <VoiceRecorder room={room} username={username} onSend={sendVoice} />
+        )}
       </div>
     </div>
   );
