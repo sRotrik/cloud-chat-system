@@ -18,7 +18,7 @@ export default function VoiceRecorder({ room, username, onSend, onCancel }) {
   const timerRef     = useRef(null);
   const analyserRef  = useRef(null);
   const animRef      = useRef(null);
-  const canvasRef    = useRef(null);
+
 
   // ── Cleanup on unmount ─────────────────────────────────────
   useEffect(() => () => stopAll(), []);

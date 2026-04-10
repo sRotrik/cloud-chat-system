@@ -246,12 +246,7 @@ function App() {
     setTimeout(() => fetchConversations(username), 500);
   };
 
-  const sendMessage = () => {
-    if (message.trim() && socketRef.current) {
-      socketRef.current.emit('send_message', { room, username, message });
-      setMessage('');
-    }
-  };
+
 
   const sendMessageWithReply = () => {
     if (message.trim() && socketRef.current) {
