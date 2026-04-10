@@ -99,8 +99,6 @@ socket.emit('online_users_list', Array.from(onlineUsers.keys()));
 socket.on('join_room', async (room) => {
 socket.join(room);
 socket.data = { ...socket.data, room };
-
-```
 const history = await Message.find({ room })
   .sort('-timestamp').limit(50);
 socket.emit('message_history', history.reverse());
@@ -108,7 +106,6 @@ socket.emit('message_history', history.reverse());
 const newHistory = await NewMessage.find({ room })
   .sort({ createdAt: -1 }).limit(50).lean();
 socket.emit('messageHistory', newHistory.reverse());
-```
 
 });
 

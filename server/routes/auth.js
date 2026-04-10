@@ -3,7 +3,6 @@ const router = express.Router();
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const User = require('../models/User');
-const fetch = require('node-fetch'); // ✅ FIX 1: import fetch
 
 const JWT_SECRET = process.env.JWT_SECRET || 'cloudchat-secret-key';
 
@@ -11,8 +10,6 @@ const JWT_SECRET = process.env.JWT_SECRET || 'cloudchat-secret-key';
 router.post('/register', async (req, res) => {
 try {
 const { username, email, password } = req.body;
-
-```
 const existing = await User.findOne({ $or: [{ email }, { username }] });
 if (existing) {
   return res.status(400).json({ error: 'Username or email already exists' });
@@ -30,7 +27,6 @@ const token = jwt.sign(
 );
 
 res.json({ token, user: { id: user._id, username: user.username, email: user.email } });
-```
 
 } catch (err) {
 res.status(500).json({ error: err.message });
@@ -41,8 +37,6 @@ res.status(500).json({ error: err.message });
 router.post('/login', async (req, res) => {
 try {
 const { email, password } = req.body;
-
-```
 const user = await User.findOne({ email });
 if (!user) return res.status(400).json({ error: 'Invalid credentials' });
 
@@ -59,7 +53,6 @@ const token = jwt.sign(
 );
 
 res.json({ token, user: { id: user._id, username: user.username, email: user.email } });
-```
 
 } catch (err) {
 res.status(500).json({ error: err.message });
@@ -71,14 +64,11 @@ router.get('/verify', async (req, res) => {
 try {
 const token = req.headers.authorization?.split(' ')[1];
 if (!token) return res.status(401).json({ error: 'No token' });
-
-```
 const decoded = jwt.verify(token, JWT_SECRET);
 const user = await User.findById(decoded.id).select('-password');
 if (!user) return res.status(401).json({ error: 'User not found' });
 
 res.json({ user });
-```
 
 } catch (err) {
 res.status(401).json({ error: 'Invalid token' });
@@ -100,8 +90,6 @@ res.redirect(googleAuthUrl);
 router.get('/google/callback', async (req, res) => {
 try {
 const { code } = req.query;
-
-```
 // ✅ FIX 2: Correct token request (form-urlencoded)
 const tokenRes = await fetch('https://oauth2.googleapis.com/token', {
   method: 'POST',
@@ -149,7 +137,6 @@ const token = jwt.sign(
 
 // Redirect to frontend
 res.redirect(`${process.env.CLIENT_URL}?token=${token}&username=${user.username}`);
-```
 
 } catch (err) {
 console.log("❌ Google Auth Error:", err.message);
