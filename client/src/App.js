@@ -401,7 +401,7 @@ function App() {
     const handleUp = () => clearTimeout(holdTimer.current);
 
     return (
-      <div style={{... (mine ? s.msgRowMine : s.msgRowTheirs), position: 'relative'}}
+      <div style={{...(mine ? s.msgRowMine : s.msgRowTheirs), position: 'relative'}}
         onMouseDown={handleDown} onMouseUp={handleUp} onTouchStart={handleDown} onTouchEnd={handleUp}
         onContextMenu={(e) => { e.preventDefault(); setShowMenu(true); }}>
         
