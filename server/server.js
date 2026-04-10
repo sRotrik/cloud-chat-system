@@ -168,12 +168,13 @@ socket.on('send_private', async (data) => {
   await msg.save();
   
   await Conversation.findOneAndUpdate(
-    { participants: { $all: [from, to] } },
+    { participants: [from, to].sort() },
     { 
-      participants: [from, to], 
-      lastMessage: 'Encrypted message', 
-      lastMessageTime: new Date(), 
-      lastMessageFrom: from,
+      $set: {
+        lastMessage: 'Encrypted message', 
+        lastMessageTime: new Date(), 
+        lastMessageFrom: from
+      },
       $inc: { [`unreadCount.${to}`]: 1 }
     },
     { upsert: true, new: true }
@@ -195,7 +196,7 @@ socket.on('send_private', async (data) => {
 
 socket.on('mark_read', async ({ from, to }) => {
   await Conversation.findOneAndUpdate(
-    { participants: { $all: [from, to] } },
+    { participants: [from, to].sort() },
     { $set: { [`unreadCount.${from}`]: 0 } }
   );
   if (onlineUsers.has(from)) {
