@@ -3,8 +3,12 @@ const mongoose = require('mongoose');
 const PrivateMessageSchema = new mongoose.Schema({
   from: { type: String, required: true },
   to: { type: String, required: true },
-  encryptedMessage: { type: String, required: true },
+  encryptedMessage: { type: String, default: '' },   // optional — empty for voice msgs
   roomId: { type: String, required: true },
+  type: { type: String, default: 'text' },           // 'text' | 'voice'
+  voiceUrl: { type: String },
+  voiceDuration: { type: Number, default: 0 },
+  waveform: { type: [Number], default: [] },
   fileUrl: { type: String },
   mimetype: { type: String },
   originalName: { type: String },

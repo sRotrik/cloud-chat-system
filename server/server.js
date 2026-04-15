@@ -123,21 +123,34 @@ expiresAt: msg.expiresAt,
 socket.on('join_private', async ({ from, to }) => {
   const roomId = getRoomId(from, to);
   socket.join(roomId);
-  
+
   const key = getSharedKey(from, to);
   const messages = await PrivateMessage.find({ roomId }).sort('-timestamp').limit(50);
-  
+
   const decrypted = messages.map(msg => {
+    // Voice messages — skip decryption entirely, return voice fields
+    if (msg.type === 'voice') {
+      return {
+        _id: msg._id, from: msg.from, to: msg.to,
+        message: '', type: 'voice',
+        voiceUrl: msg.voiceUrl, voiceDuration: msg.voiceDuration, waveform: msg.waveform,
+        timestamp: msg.timestamp, expiresAt: msg.expiresAt
+      };
+    }
+    // File/media messages with no encrypted text
+    if (!msg.encryptedMessage) {
+      return { _id: msg._id, from: msg.from, to: msg.to, message: '', type: msg.type || 'text', fileUrl: msg.fileUrl, mimetype: msg.mimetype, originalName: msg.originalName, timestamp: msg.timestamp, expiresAt: msg.expiresAt };
+    }
+    // Encrypted text messages
     try {
-      if (!msg.encryptedMessage) return { _id: msg._id, from: msg.from, to: msg.to, message: '', fileUrl: msg.fileUrl, mimetype: msg.mimetype, originalName: msg.originalName, timestamp: msg.timestamp, expiresAt: msg.expiresAt };
       const [ivHex, encrypted] = msg.encryptedMessage.split(':');
       const iv = Buffer.from(ivHex, 'hex');
       const decipher = crypto.createDecipheriv('aes-256-cbc', Buffer.from(key), iv);
       let text = decipher.update(encrypted, 'hex', 'utf8');
       text += decipher.final('utf8');
-      return { _id: msg._id, from: msg.from, to: msg.to, message: text, timestamp: msg.timestamp, expiresAt: msg.expiresAt, fileUrl: msg.fileUrl, mimetype: msg.mimetype, originalName: msg.originalName };
+      return { _id: msg._id, from: msg.from, to: msg.to, message: text, type: 'text', timestamp: msg.timestamp, expiresAt: msg.expiresAt, fileUrl: msg.fileUrl, mimetype: msg.mimetype, originalName: msg.originalName };
     } catch {
-      return { _id: msg._id, from: msg.from, to: msg.to, message: '[Encrypted]', timestamp: msg.timestamp };
+      return { _id: msg._id, from: msg.from, to: msg.to, message: '[Encrypted]', type: 'text', timestamp: msg.timestamp };
     }
   }).reverse();
 
@@ -145,10 +158,11 @@ socket.on('join_private', async ({ from, to }) => {
 });
 
 socket.on('send_private', async (data) => {
-  const { from, to, message, fileUrl, fileId, mimetype, originalName } = data;
+  const { from, to, message, fileUrl, fileId, mimetype, originalName,
+          type, voiceUrl, voiceDuration, waveform } = data;
   const roomId = getRoomId(from, to);
   const key = getSharedKey(from, to);
-  
+
   let encryptedMessage = '';
   if (message) {
     const iv = crypto.randomBytes(16);
@@ -157,22 +171,26 @@ socket.on('send_private', async (data) => {
     encrypted += cipher.final('hex');
     encryptedMessage = `${iv.toString('hex')}:${encrypted}`;
   }
-  
+
   const expiresAt = new Date(Date.now() + 5 * 60 * 1000);
 
   const msg = new PrivateMessage({
     roomId, from, to, encryptedMessage,
+    type: type || 'text',
+    voiceUrl: voiceUrl || null,
+    voiceDuration: voiceDuration || 0,
+    waveform: waveform || [],
     fileUrl, fileId, mimetype, originalName,
     expiresAt
   });
   await msg.save();
-  
+
   await Conversation.findOneAndUpdate(
     { participants: [from, to].sort() },
-    { 
+    {
       $set: {
-        lastMessage: 'Encrypted message', 
-        lastMessageTime: new Date(), 
+        lastMessage: type === 'voice' ? '🎤 Voice message' : 'Encrypted message',
+        lastMessageTime: new Date(),
         lastMessageFrom: from
       },
       $inc: { [`unreadCount.${to}`]: 1 }
@@ -182,13 +200,17 @@ socket.on('send_private', async (data) => {
 
   const payload = {
     _id: msg._id,
-    from, to, message, 
+    from, to, message,
+    type: msg.type,
+    voiceUrl: msg.voiceUrl,
+    voiceDuration: msg.voiceDuration,
+    waveform: msg.waveform,
     fileUrl, fileId, mimetype, originalName,
     timestamp: msg.timestamp, expiresAt
   };
 
   io.to(roomId).emit('receive_private', payload);
-  
+
   const recipientSocketId = onlineUsers.get(to);
   if (recipientSocketId) {
     io.to(recipientSocketId).emit('private_notification', { from });

@@ -8,7 +8,8 @@ import './VoiceRecorder.css';
 
 const MAX_DURATION = 60; // seconds
 
-export default function VoiceRecorder({ room, username, onSend, onCancel }) {
+export default function VoiceRecorder({ room, username, onSend, onCancel, serverUrl }) {
+  const UPLOAD_BASE = serverUrl || process.env.REACT_APP_SERVER_URL || 'http://localhost:3001';
   const [state, setState]   = useState('idle');   // idle | recording | uploading
   const [duration, setDur]  = useState(0);
   const [bars, setBars]     = useState(Array(30).fill(4));
@@ -21,11 +22,14 @@ export default function VoiceRecorder({ room, username, onSend, onCancel }) {
 
 
   // ── Cleanup on unmount ─────────────────────────────────────
-  useEffect(() => () => stopAll(), []);
+  useEffect(() => () => { stopAll(); stopStream(); }, []);
 
   function stopAll() {
     clearInterval(timerRef.current);
     cancelAnimationFrame(animRef.current);
+  }
+
+  function stopStream() {
     mediaRef.current?.stream?.getTracks().forEach(t => t.stop());
   }
 
@@ -81,19 +85,28 @@ export default function VoiceRecorder({ room, username, onSend, onCancel }) {
 
   // ── Stop and send ──────────────────────────────────────────
   async function stopRecording() {
+    const recorder = mediaRef.current;
+    if (!recorder || recorder.state === 'inactive') {
+      stopAll(); stopStream(); setState('idle'); return;
+    }
+
+    // Stop timers & animation first (does NOT stop the recorder)
     stopAll();
     setState('uploading');
 
-    const recorder = mediaRef.current;
-    if (!recorder || recorder.state === 'inactive') {
-      setState('idle'); return;
-    }
-
+    // Set onstop BEFORE calling recorder.stop() so the event is caught
     recorder.onstop = async () => {
+      // Now it's safe to release the mic
+      stopStream();
       const blob = new Blob(chunksRef.current, { type: 'audio/webm' });
+      if (blob.size === 0) {
+        alert('No audio captured. Please try again.');
+        setState('idle'); setDur(0); return;
+      }
       await uploadAudio(blob);
     };
-    recorder.stop();
+
+    recorder.stop(); // triggers ondataavailable flush → onstop
   }
 
   async function uploadAudio(blob) {
@@ -104,8 +117,7 @@ export default function VoiceRecorder({ room, username, onSend, onCancel }) {
       formData.append('room', room);
       formData.append('duration', duration);
 
-      const SERVER = process.env.REACT_APP_SERVER_URL || 'http://localhost:3001';
-      const res  = await fetch(`${SERVER}/api/voice/upload`, { method: 'POST', body: formData });
+      const res  = await fetch(`${UPLOAD_BASE}/api/voice/upload`, { method: 'POST', body: formData });
       const data = await res.json();
 
       if (data.success) {

@@ -789,7 +789,7 @@ function App() {
         {privateMessage.trim() ? (
           <button style={s.sendBtn} onClick={sendPrivateMessage} disabled={!privateMessage.trim()}>↑</button>
         ) : (
-          <VoiceRecorder username={username} onSend={sendPrivateVoice} />
+          <VoiceRecorder username={username} onSend={sendPrivateVoice} serverUrl={SERVER} />
         )}
       </div>
     </div>
@@ -900,7 +900,7 @@ function App() {
         {message.trim() ? (
           <button style={s.sendBtn} onClick={sendMessageWithReply} disabled={!message.trim()}>↑</button>
         ) : (
-          <VoiceRecorder room={room} username={username} onSend={sendVoice} />
+          <VoiceRecorder room={room} username={username} onSend={sendVoice} serverUrl={SERVER} />
         )}
       </div>
     </div>
