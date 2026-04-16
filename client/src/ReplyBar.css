@@ -1,22 +1,28 @@
-/* ReplyBar.css */
+/* ReplyBar.css — Glassmorphism Dark Theme */
 
 .reply-bar {
   display: flex;
   align-items: center;
-  gap: 10px;
-  background: #f0f4f8;
-  border-top: 1px solid #e0e0e0;
-  padding: 8px 14px;
-  animation: slideUp .15s ease;
+  gap: 12px;
+  background: rgba(139,92,246,0.06);
+  border-top: 1px solid rgba(139,92,246,0.14);
+  padding: 8px 18px;
+  animation: slideUp .18s cubic-bezier(0.34,1.56,0.64,1);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
 }
-@keyframes slideUp { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+@keyframes slideUp {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: none; }
+}
 
 .rb-indicator {
   width: 3px;
   min-height: 36px;
-  background: #128C7E;
-  border-radius: 2px;
+  background: linear-gradient(to bottom, #8b5cf6, #6d28d9);
+  border-radius: 3px;
   flex-shrink: 0;
+  box-shadow: 0 0 8px rgba(139,92,246,0.5);
 }
 
 .rb-content {
@@ -25,18 +31,21 @@
 }
 .rb-username {
   display: block;
-  font-size: 12px;
+  font-size: 11px;
   font-weight: 700;
-  color: #128C7E;
+  color: #a78bfa;
   margin-bottom: 2px;
+  letter-spacing: 0.02em;
+  font-family: 'Inter', sans-serif;
 }
 .rb-text {
   display: block;
   font-size: 12px;
-  color: #666;
+  color: rgba(200,180,255,0.45);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  font-family: 'Inter', sans-serif;
 }
 
 .rb-cancel {
@@ -44,14 +53,16 @@
   border: none;
   font-size: 16px;
   cursor: pointer;
-  color: #aaa;
-  padding: 4px;
+  color: rgba(196,181,253,0.3);
+  padding: 5px;
   border-radius: 50%;
   flex-shrink: 0;
+  transition: background .15s, color .15s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
-.rb-cancel:hover { background: rgba(0,0,0,.08); color: #555; }
-
-@media (prefers-color-scheme: dark) {
-  .reply-bar  { background: #1e2a31; border-color: #2a3942; }
-  .rb-text    { color: #aaa; }
+.rb-cancel:hover {
+  background: rgba(139,92,246,0.12);
+  color: #c4b5fd;
 }

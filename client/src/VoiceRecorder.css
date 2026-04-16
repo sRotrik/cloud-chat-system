@@ -1,4 +1,4 @@
-/* VoiceRecorder.css */
+/* VoiceRecorder.css — Glassmorphism Dark Theme */
 
 .voice-recorder {
   display: flex;
@@ -12,47 +12,68 @@
   cursor: pointer;
   padding: 6px;
   border-radius: 50%;
-  transition: background .15s;
+  transition: background .15s, transform .12s;
+  color: rgba(196,181,253,0.65);
 }
-.vr-btn:hover { background: rgba(0,0,0,.08); }
+.vr-btn:hover {
+  background: rgba(139,92,246,0.15);
+  color: #c4b5fd;
+  transform: scale(1.08);
+}
 
-.vr-start { color: #128C7E; }
-.vr-stop  { background: #128C7E; color: #fff; font-size: 18px; }
-.vr-stop:hover { background: #0a6e65; }
-.vr-cancel { color: #e53935; font-size: 18px; }
+.vr-start { color: #a78bfa; }
+.vr-stop  {
+  background: linear-gradient(135deg, #8b5cf6, #6d28d9);
+  color: #fff;
+  font-size: 18px;
+  box-shadow: 0 4px 18px rgba(139,92,246,0.55);
+}
+.vr-stop:hover {
+  background: linear-gradient(135deg, #7c3aed, #5b21b6);
+  box-shadow: 0 6px 24px rgba(139,92,246,0.7);
+}
+.vr-cancel { color: rgba(248,113,113,0.8); font-size: 18px; }
+.vr-cancel:hover { color: #fca5a5; background: rgba(239,68,68,0.12); }
 
 .vr-active {
   display: flex;
   align-items: center;
-  gap: 8px;
-  background: #fff3e0;
-  border-radius: 24px;
-  padding: 6px 12px;
+  gap: 10px;
+  background: rgba(139,92,246,0.1);
+  border: 1px solid rgba(139,92,246,0.22);
+  border-radius: 28px;
+  padding: 6px 14px;
   animation: fadeIn .2s ease;
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  box-shadow: 0 4px 20px rgba(139,92,246,0.2);
 }
 
-@keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+@keyframes fadeIn { from { opacity: 0; transform: scale(0.95); } to { opacity: 1; transform: scale(1); } }
 
 .vr-waveform {
   display: flex;
   align-items: center;
   gap: 2px;
-  height: 48px;
+  height: 32px;
 }
 
 .vr-bar {
   width: 3px;
-  background: #e53935;
+  background: linear-gradient(to top, #8b5cf6, #c4b5fd);
   border-radius: 2px;
   transition: height .08s ease;
   min-height: 4px;
+  opacity: 0.8;
 }
 
 .vr-duration {
   font-size: 13px;
   font-weight: 600;
-  color: #e53935;
+  color: #a78bfa;
   min-width: 36px;
+  font-family: 'Inter', sans-serif;
+  letter-spacing: 0.02em;
 }
 
 .vr-uploading {
@@ -60,14 +81,16 @@
   align-items: center;
   gap: 8px;
   font-size: 13px;
-  color: #888;
+  color: rgba(196,181,253,0.55);
   padding: 6px 12px;
+  font-family: 'Inter', sans-serif;
 }
 
 .vr-spinner {
-  width: 16px; height: 16px;
-  border: 2px solid #ccc;
-  border-top-color: #128C7E;
+  width: 16px;
+  height: 16px;
+  border: 2px solid rgba(139,92,246,0.2);
+  border-top-color: #8b5cf6;
   border-radius: 50%;
   display: inline-block;
   animation: spin .7s linear infinite;
