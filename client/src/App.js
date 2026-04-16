@@ -902,234 +902,224 @@ function App() {
 const CSS = `
   * { box-sizing: border-box; margin: 0; padding: 0; }
   html, body { height: 100%; }
-  body { margin: 0; font-family: 'Inter', sans-serif; background: #06040f; color: #f0eaff; -webkit-font-smoothing: antialiased; }
+  body { margin: 0; font-family: 'Inter', sans-serif; background: #e0f7fa; color: #0f172a; -webkit-font-smoothing: antialiased; }
   input, button, select, textarea { font-family: 'Inter', sans-serif; }
-  ::placeholder { color: rgba(180,160,255,0.25); }
-  ::selection { background: rgba(139,92,246,0.38); color: #fff; }
+  ::placeholder { color: rgba(15, 23, 42, 0.4); }
+  ::selection { background: rgba(6, 182, 212, 0.3); color: #0f172a; }
   ::-webkit-scrollbar { width: 4px; }
   ::-webkit-scrollbar-track { background: transparent; }
-  ::-webkit-scrollbar-thumb { background: rgba(139,92,246,0.28); border-radius: 99px; }
-  ::-webkit-scrollbar-thumb:hover { background: rgba(139,92,246,0.52); }
+  ::-webkit-scrollbar-thumb { background: rgba(6, 182, 212, 0.3); border-radius: 99px; }
+  ::-webkit-scrollbar-thumb:hover { background: rgba(6, 182, 212, 0.6); }
   @keyframes spin { to { transform: rotate(360deg); } }
   @keyframes pulseGlow {
-    0%,100% { box-shadow: 0 0 14px rgba(139,92,246,0.45), 0 0 0 1px rgba(139,92,246,0.28) inset; }
-    50% { box-shadow: 0 0 32px rgba(139,92,246,0.82), 0 0 60px rgba(139,92,246,0.16), 0 0 0 1px rgba(139,92,246,0.4) inset; }
+    0%,100% { box-shadow: 0 0 14px rgba(6,182,212,0.3), 0 0 0 1px rgba(6,182,212,0.2) inset; }
+    50% { box-shadow: 0 0 32px rgba(6,182,212,0.6), 0 0 60px rgba(6,182,212,0.1), 0 0 0 1px rgba(6,182,212,0.3) inset; }
   }
   @keyframes auroraShift {
-    0%,100% { transform: translate(0,0) scale(1) rotate(0deg); opacity: 0.85; }
-    33% { transform: translate(55px,-38px) scale(1.1) rotate(5deg); opacity: 0.95; }
-    66% { transform: translate(-38px,28px) scale(0.92) rotate(-3deg); opacity: 0.78; }
+    0%,100% { transform: translate(0,0) scale(1) rotate(0deg); opacity: 0.6; }
+    33% { transform: translate(55px,-38px) scale(1.1) rotate(5deg); opacity: 0.8; }
+    66% { transform: translate(-38px,28px) scale(0.92) rotate(-3deg); opacity: 0.5; }
   }
   @keyframes auroraShift2 {
-    0%,100% { transform: translate(0,0) scale(1) rotate(0deg); opacity: 0.75; }
-    33% { transform: translate(-52px,60px) scale(0.96) rotate(-4deg); opacity: 0.65; }
-    66% { transform: translate(42px,-22px) scale(1.06) rotate(3deg); opacity: 0.88; }
+    0%,100% { transform: translate(0,0) scale(1) rotate(0deg); opacity: 0.5; }
+    33% { transform: translate(-52px,60px) scale(0.96) rotate(-4deg); opacity: 0.7; }
+    66% { transform: translate(42px,-22px) scale(1.06) rotate(3deg); opacity: 0.4; }
   }
   @keyframes auroraShift3 { 0%,100% { transform: translate(0,0) scale(1); } 50% { transform: translate(30px,45px) scale(1.12); } }
   @keyframes fadeUp { from { opacity: 0; transform: translateY(12px) scale(0.96); } to { opacity: 1; transform: translateY(0) scale(1); } }
-  @keyframes typingPulse { 0%,80%,100% { opacity:0.25; transform:scale(0.7); } 40% { opacity:1; transform:scale(1.1); } }
+  @keyframes typingPulse { 0%,80%,100% { opacity:0.3; transform:scale(0.7); } 40% { opacity:1; transform:scale(1.1); } }
   @keyframes toastIn { from { opacity:0; transform:translateY(-105%) scale(0.96); } to { opacity:1; transform:translateY(0) scale(1); } }
   @keyframes shimmer { 0% { background-position: -300px 0; } 100% { background-position: 300px 0; } }
   .msg-enter { animation: fadeUp 0.28s cubic-bezier(0.34,1.56,0.64,1); }
-  .typing-dot span { display:inline-block; width:5px; height:5px; border-radius:50%; background:rgba(139,92,246,0.75); margin:0 2.5px; animation:typingPulse 1.4s ease-in-out infinite; }
+  .typing-dot span { display:inline-block; width:5px; height:5px; border-radius:50%; background:rgba(6,182,212,0.8); margin:0 2.5px; animation:typingPulse 1.4s ease-in-out infinite; }
   .typing-dot span:nth-child(2) { animation-delay:0.2s; }
   .typing-dot span:nth-child(3) { animation-delay:0.4s; }
-  .icon-btn:hover { background:rgba(139,92,246,0.18) !important; border-color:rgba(139,92,246,0.42) !important; color:#e0d4ff !important; transform:scale(1.05); }
-  .attach-btn:hover { background:rgba(139,92,246,0.18) !important; border-color:rgba(139,92,246,0.42) !important; }
-  .send-btn:hover { transform:scale(1.08) !important; box-shadow:0 8px 36px rgba(139,92,246,0.78) !important; }
-  .home-card:hover { background:rgba(139,92,246,0.09) !important; border-color:rgba(139,92,246,0.28) !important; transform:translateY(-3px) !important; box-shadow:0 12px 40px rgba(139,92,246,0.16) !important; }
-  .dm-row:hover { background:rgba(139,92,246,0.08) !important; }
-  .room-tile:hover { border-color:rgba(139,92,246,0.5) !important; background:rgba(139,92,246,0.1) !important; transform:translateY(-2px) !important; box-shadow:0 8px 28px rgba(139,92,246,0.18) !important; }
-  .msg-input:focus { border-color:rgba(139,92,246,0.6) !important; box-shadow:0 0 0 3px rgba(139,92,246,0.16) !important; }
-  .primary-btn:hover { transform:translateY(-1px); box-shadow:0 8px 32px rgba(139,92,246,0.7) !important; }
-  .google-btn:hover { background:rgba(255,255,255,0.09) !important; border-color:rgba(255,255,255,0.16) !important; }
-  .sign-out-btn:hover { background:rgba(255,255,255,0.06) !important; border-color:rgba(255,255,255,0.14) !important; color:rgba(255,255,255,0.55) !important; }
-  .dm-row-action:hover { background:rgba(139,92,246,0.18) !important; border-color:rgba(139,92,246,0.38) !important; color:#c4b5fd !important; }
+  .icon-btn:hover { background:rgba(6,182,212,0.15) !important; border-color:rgba(6,182,212,0.3) !important; color:#0e7490 !important; transform:scale(1.05); }
+  .attach-btn:hover { background:rgba(6,182,212,0.15) !important; border-color:rgba(6,182,212,0.3) !important; }
+  .send-btn:hover { transform:scale(1.08) !important; box-shadow:0 8px 36px rgba(6,182,212,0.6) !important; }
+  .home-card:hover { background:rgba(255,255,255,0.8) !important; border-color:rgba(6,182,212,0.3) !important; transform:translateY(-3px) !important; box-shadow:0 12px 40px rgba(6,182,212,0.12) !important; }
+  .dm-row:hover { background:rgba(255,255,255,0.6) !important; }
+  .room-tile:hover { border-color:rgba(6,182,212,0.4) !important; background:rgba(255,255,255,0.7) !important; transform:translateY(-2px) !important; box-shadow:0 8px 28px rgba(6,182,212,0.15) !important; }
+  .msg-input:focus { border-color:rgba(6,182,212,0.5) !important; box-shadow:0 0 0 3px rgba(6,182,212,0.15), inset 0 1px 0 rgba(255,255,255,0.5) !important; }
+  .primary-btn:hover { transform:translateY(-1px); box-shadow:0 8px 32px rgba(6,182,212,0.5) !important; }
+  .google-btn:hover { background:rgba(255,255,255,0.8) !important; border-color:rgba(6,182,212,0.2) !important; }
+  .sign-out-btn:hover { background:rgba(239,68,68,0.1) !important; border-color:rgba(239,68,68,0.3) !important; color:#ef4444 !important; }
+  .dm-row-action:hover { background:rgba(6,182,212,0.15) !important; border-color:rgba(6,182,212,0.4) !important; color:#0e7490 !important; }
 `;
 
 const s = {
-  // ── Auth / Background ─────────────────────────────────────
   authBg: {
     minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center',
-    background: 'radial-gradient(ellipse 120% 80% at 60% -10%, rgba(109,40,217,0.55) 0%, transparent 55%), radial-gradient(ellipse 80% 60% at -10% 80%, rgba(59,130,246,0.32) 0%, transparent 55%), #06040f',
+    background: 'radial-gradient(ellipse 120% 80% at 60% -10%, rgba(34,211,238,0.4) 0%, transparent 55%), radial-gradient(ellipse 80% 60% at -10% 80%, rgba(56,189,248,0.3) 0%, transparent 55%), #f0f9ff',
     position: 'relative', overflow: 'hidden', padding: '16px',
   },
   authNoise: { position: 'fixed', inset: 0, pointerEvents: 'none', zIndex: 0 },
   authGlow1: {
     position: 'fixed', width: '700px', height: '700px', borderRadius: '50%',
-    background: 'radial-gradient(circle, rgba(139,92,246,0.22) 0%, rgba(109,40,217,0.06) 50%, transparent 72%)',
+    background: 'radial-gradient(circle, rgba(6,182,212,0.3) 0%, rgba(8,145,178,0.1) 50%, transparent 72%)',
     top: '-200px', right: '-180px', pointerEvents: 'none', zIndex: 0,
-    animation: 'auroraShift 20s ease-in-out infinite', filter: 'blur(6px)',
+    animation: 'auroraShift 20s ease-in-out infinite', filter: 'blur(10px)',
   },
   authGlow2: {
     position: 'fixed', width: '580px', height: '580px', borderRadius: '50%',
-    background: 'radial-gradient(circle, rgba(59,130,246,0.16) 0%, rgba(37,99,235,0.04) 50%, transparent 72%)',
+    background: 'radial-gradient(circle, rgba(56,189,248,0.25) 0%, rgba(2,132,199,0.1) 50%, transparent 72%)',
     bottom: '-160px', left: '-130px', pointerEvents: 'none', zIndex: 0,
-    animation: 'auroraShift2 25s ease-in-out infinite', filter: 'blur(8px)',
+    animation: 'auroraShift2 25s ease-in-out infinite', filter: 'blur(12px)',
   },
   authCard: {
     width: '100%', maxWidth: '420px', position: 'relative', zIndex: 1,
-    background: 'rgba(255,255,255,0.042)',
-    border: '1px solid rgba(255,255,255,0.10)',
+    background: 'rgba(255,255,255,0.65)',
+    border: '1px solid rgba(255,255,255,0.8)',
     borderRadius: '28px', padding: '42px 38px',
     display: 'flex', flexDirection: 'column', gap: '18px',
-    backdropFilter: 'blur(48px)', WebkitBackdropFilter: 'blur(48px)',
-    boxShadow: '0 0 0 1px rgba(255,255,255,0.04) inset, 0 48px 96px rgba(0,0,0,0.6), 0 0 100px rgba(139,92,246,0.08)',
+    backdropFilter: 'blur(32px)', WebkitBackdropFilter: 'blur(32px)',
+    boxShadow: '0 0 0 1px rgba(255,255,255,0.4) inset, 0 24px 64px rgba(0,0,0,0.08), 0 0 80px rgba(6,182,212,0.15)',
   },
-
-  // ── Logo / Brand ──────────────────────────────────────────
   logoMark: {
     width: '58px', height: '58px', borderRadius: '19px', margin: '0 auto 10px',
-    background: 'linear-gradient(135deg, #9d71ff 0%, #6d28d9 100%)',
-    display: 'flex', alignItems: 'center', justifyContent: 'center',
-    boxShadow: '0 12px 40px rgba(139,92,246,0.6), 0 0 0 1px rgba(180,140,255,0.35) inset',
+    background: 'linear-gradient(135deg, #22d3ee 0%, #0891b2 100%)',
+    display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff',
+    boxShadow: '0 12px 30px rgba(6,182,212,0.4), 0 0 0 1px rgba(255,255,255,0.4) inset',
     animation: 'pulseGlow 3.5s ease-in-out infinite',
   },
   brandName: {
     fontSize: '25px', fontWeight: '800', letterSpacing: '-0.045em',
-    background: 'linear-gradient(135deg, #ffffff 0%, #d4b8ff 60%, #a78bfa 100%)',
+    background: 'linear-gradient(135deg, #0f172a 0%, #334155 60%, #475569 100%)',
     WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent',
   },
-  brandSub: { fontSize: '13px', color: 'rgba(200,180,255,0.4)', marginTop: '3px', letterSpacing: '-0.01em' },
-
-  // ── Form Elements ─────────────────────────────────────────
+  brandSub: { fontSize: '13px', color: 'rgba(15,23,42,0.5)', marginTop: '3px', letterSpacing: '-0.01em' },
   errorPill: {
-    background: 'rgba(239,68,68,0.09)', border: '1px solid rgba(239,68,68,0.24)',
-    borderRadius: '14px', padding: '10px 16px', color: '#fca5a5', fontSize: '13px',
+    background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.3)',
+    borderRadius: '14px', padding: '10px 16px', color: '#dc2626', fontSize: '13px',
     backdropFilter: 'blur(10px)',
   },
   fieldGroup: { display: 'flex', flexDirection: 'column', gap: '7px' },
   fieldLabel: {
-    fontSize: '10px', fontWeight: '700', color: 'rgba(196,181,253,0.45)',
+    fontSize: '10px', fontWeight: '700', color: '#64748b',
     letterSpacing: '0.08em', textTransform: 'uppercase',
   },
   field: {
-    padding: '13px 17px', borderRadius: '15px', fontSize: '15px', color: '#f0eaff',
-    outline: 'none', background: 'rgba(139,92,246,0.08)',
-    border: '1px solid rgba(139,92,246,0.18)',
+    padding: '13px 17px', borderRadius: '15px', fontSize: '15px', color: '#0f172a',
+    outline: 'none', background: 'rgba(255,255,255,0.6)',
+    border: '1px solid rgba(148,163,184,0.3)',
     transition: 'all 0.22s', width: '100%',
-    boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.04)',
+    boxShadow: 'inset 0 2px 4px rgba(0,0,0,0.02)',
   },
   primaryBtn: {
     padding: '14px', borderRadius: '15px', color: '#fff', fontSize: '15px', fontWeight: '700',
     cursor: 'pointer', width: '100%', letterSpacing: '-0.01em', border: 'none',
-    background: 'linear-gradient(135deg, #9d71ff 0%, #6d28d9 100%)',
-    boxShadow: '0 6px 28px rgba(139,92,246,0.55), 0 0 0 1px rgba(255,255,255,0.12) inset',
+    background: 'linear-gradient(135deg, #06b6d4 0%, #0891b2 100%)',
+    boxShadow: '0 6px 20px rgba(6,182,212,0.4), 0 0 0 1px rgba(255,255,255,0.2) inset',
     transition: 'all 0.22s',
   },
   orRow: { display: 'flex', alignItems: 'center', gap: '14px' },
-  orLine: { flex: 1, height: '1px', background: 'rgba(139,92,246,0.14)' },
-  orText: { fontSize: '12px', color: 'rgba(255,255,255,0.24)' },
+  orLine: { flex: 1, height: '1px', background: 'rgba(148,163,184,0.2)' },
+  orText: { fontSize: '12px', color: '#64748b' },
   googleBtn: {
-    padding: '13px', background: 'rgba(255,255,255,0.05)',
-    border: '1px solid rgba(255,255,255,0.09)', borderRadius: '15px',
-    color: 'rgba(255,255,255,0.82)', fontSize: '14px', cursor: 'pointer',
+    padding: '13px', background: 'rgba(255,255,255,0.7)',
+    border: '1px solid rgba(148,163,184,0.3)', borderRadius: '15px',
+    color: '#334155', fontSize: '14px', cursor: 'pointer', fontWeight: '600',
     width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center',
     gap: '10px', transition: 'all 0.22s', letterSpacing: '-0.01em',
+    boxShadow: '0 2px 4px rgba(0,0,0,0.02)',
   },
-  switchRow: { fontSize: '13px', color: 'rgba(200,180,255,0.3)', textAlign: 'center' },
-  switchLink: { color: '#a78bfa', cursor: 'pointer', fontWeight: '600' },
+  switchRow: { fontSize: '13px', color: '#64748b', textAlign: 'center' },
+  switchLink: { color: '#0891b2', cursor: 'pointer', fontWeight: '700' },
   spinner: { display: 'inline-block', animation: 'spin 0.8s linear infinite' },
   backLink: {
-    background: 'none', border: 'none', color: 'rgba(196,181,253,0.38)',
+    background: 'none', border: 'none', color: '#64748b',
     fontSize: '13px', cursor: 'pointer', padding: '0', textAlign: 'left',
     transition: 'color 0.18s',
   },
-
-  // ── Home Screen ───────────────────────────────────────────
-  homeGreeting: { fontSize: '14px', color: 'rgba(200,180,255,0.38)', marginTop: '5px', letterSpacing: '-0.01em' },
+  homeGreeting: { fontSize: '14px', color: '#64748b', marginTop: '5px', letterSpacing: '-0.01em' },
   homeUsername: {
-    background: 'linear-gradient(135deg, #d4b8ff, #8b5cf6)',
-    WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', fontWeight: '700',
+    background: 'linear-gradient(135deg, #06b6d4, #0284c7)',
+    WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', fontWeight: '800',
   },
   homeCardRow: { display: 'flex', flexDirection: 'column', gap: '12px' },
   homeCard: {
     display: 'flex', alignItems: 'center', gap: '16px',
-    background: 'rgba(255,255,255,0.035)',
-    border: '1px solid rgba(139,92,246,0.14)',
+    background: 'rgba(255,255,255,0.5)',
+    border: '1px solid rgba(255,255,255,0.8)',
     borderRadius: '22px', padding: '20px 18px',
     cursor: 'pointer', transition: 'all 0.24s',
     backdropFilter: 'blur(20px)', WebkitBackdropFilter: 'blur(20px)',
-    boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.05)',
+    boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.8), 0 4px 12px rgba(0,0,0,0.03)',
   },
   homeCardIconWrap: {
     width: '52px', height: '52px', borderRadius: '17px', flexShrink: 0,
-    background: 'linear-gradient(135deg, rgba(139,92,246,0.25), rgba(109,40,217,0.1))',
-    border: '1px solid rgba(139,92,246,0.22)',
+    background: 'linear-gradient(135deg, rgba(34,211,238,0.2), rgba(6,182,212,0.1))',
+    border: '1px solid rgba(6,182,212,0.2)',
     display: 'flex', alignItems: 'center', justifyContent: 'center',
-    boxShadow: '0 4px 14px rgba(139,92,246,0.2)',
+    boxShadow: '0 4px 14px rgba(6,182,212,0.15)',
   },
   homeCardBody: { flex: 1 },
   homeCardTitle: {
-    fontSize: '15px', fontWeight: '600', color: '#f0eaff',
+    fontSize: '15px', fontWeight: '700', color: '#0f172a',
     display: 'flex', alignItems: 'center', gap: '8px', letterSpacing: '-0.02em',
   },
-  homeCardMeta: { fontSize: '12px', color: 'rgba(196,181,253,0.32)', marginTop: '4px', letterSpacing: '-0.01em' },
-  homeCardChevron: { fontSize: '22px', color: 'rgba(139,92,246,0.38)', fontWeight: '300' },
+  homeCardMeta: { fontSize: '12px', color: '#64748b', marginTop: '4px', letterSpacing: '-0.01em' },
+  homeCardChevron: { fontSize: '22px', color: '#94a3b8', fontWeight: '300' },
   unreadPill: {
-    background: 'linear-gradient(135deg, #8b5cf6, #6d28d9)', color: '#fff',
+    background: 'linear-gradient(135deg, #06b6d4, #0891b2)', color: '#fff',
     borderRadius: '99px', padding: '1px 9px', fontSize: '11px', fontWeight: '700',
-    boxShadow: '0 0 14px rgba(139,92,246,0.6)',
+    boxShadow: '0 2px 8px rgba(6,182,212,0.4)',
   },
   signOutBtn: {
-    background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)',
-    borderRadius: '15px', color: 'rgba(200,180,255,0.3)', fontSize: '13px',
+    background: 'rgba(255,255,255,0.4)', border: '1px solid rgba(148,163,184,0.3)',
+    borderRadius: '15px', color: '#64748b', fontSize: '13px', fontWeight: '600',
     cursor: 'pointer', padding: '12px', width: '100%', transition: 'all 0.22s',
     letterSpacing: '-0.01em',
   },
   versionBadge: {
-    textAlign: 'center', fontSize: '11px', color: 'rgba(196,181,253,0.22)',
-    letterSpacing: '0.05em', marginTop: '2px',
+    textAlign: 'center', fontSize: '11px', color: '#94a3b8',
+    letterSpacing: '0.05em', marginTop: '2px', fontWeight: '600',
   },
-
-  // ── Room Select ───────────────────────────────────────────
   roomGrid: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' },
   roomTile: {
-    background: 'rgba(255,255,255,0.03)',
-    border: '1px solid rgba(139,92,246,0.14)',
+    background: 'rgba(255,255,255,0.5)',
+    border: '1px solid rgba(255,255,255,0.8)',
     borderRadius: '22px', padding: '22px 14px',
     cursor: 'pointer', textAlign: 'center',
     transition: 'all 0.24s',
     backdropFilter: 'blur(16px)', WebkitBackdropFilter: 'blur(16px)',
-    boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.04)',
+    boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.8), 0 4px 12px rgba(0,0,0,0.03)',
   },
   roomTileActive: {
-    background: 'rgba(139,92,246,0.14)',
-    border: '1px solid rgba(139,92,246,0.48)',
-    boxShadow: '0 0 32px rgba(139,92,246,0.22), inset 0 1px 0 rgba(255,255,255,0.08)',
+    background: 'rgba(255,255,255,0.8)',
+    border: '1px solid rgba(6,182,212,0.4)',
+    boxShadow: '0 8px 24px rgba(6,182,212,0.15), inset 0 1px 0 rgba(255,255,255,0.8)',
   },
   roomEmoji: { fontSize: '28px', marginBottom: '10px' },
-  roomLabel: { fontSize: '14px', fontWeight: '700', color: '#f0eaff', letterSpacing: '-0.02em' },
-  roomDesc: { fontSize: '11px', color: 'rgba(196,181,253,0.32)', marginTop: '4px' },
-
-  // ── App Shell ─────────────────────────────────────────────
+  roomLabel: { fontSize: '14px', fontWeight: '800', color: '#0f172a', letterSpacing: '-0.02em' },
+  roomDesc: { fontSize: '11px', color: '#64748b', marginTop: '4px' },
   appShell: {
     display: 'flex', flexDirection: 'column', height: '100vh', overflow: 'hidden',
-    background: 'radial-gradient(ellipse 130% 70% at 70% -15%, rgba(109,40,217,0.4) 0%, transparent 50%), radial-gradient(ellipse 70% 60% at -10% 90%, rgba(37,99,235,0.2) 0%, transparent 50%), #06040f',
+    background: 'radial-gradient(ellipse 120% 80% at 60% -10%, rgba(34,211,238,0.2) 0%, transparent 55%), radial-gradient(ellipse 80% 60% at -10% 80%, rgba(56,189,248,0.15) 0%, transparent 55%), #f0f9ff',
     position: 'relative',
   },
   appHeader: {
     display: 'flex', alignItems: 'center', justifyContent: 'space-between',
     padding: '10px 20px',
-    borderBottom: '1px solid rgba(139,92,246,0.12)',
-    background: 'rgba(6,4,15,0.88)',
-    backdropFilter: 'blur(40px)', WebkitBackdropFilter: 'blur(40px)',
+    borderBottom: '1px solid rgba(255,255,255,0.5)',
+    background: 'rgba(255,255,255,0.65)',
+    backdropFilter: 'blur(20px)', WebkitBackdropFilter: 'blur(20px)',
     minHeight: '64px', flexShrink: 0, gap: '12px',
-    boxShadow: '0 1px 0 rgba(139,92,246,0.09), 0 8px 40px rgba(0,0,0,0.5)',
+    boxShadow: '0 2px 10px rgba(0,0,0,0.02)',
     position: 'relative', zIndex: 20,
   },
   appHeaderLeft: { display: 'flex', alignItems: 'center', gap: '12px', flex: 1, minWidth: 0 },
   appHeaderRight: { display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 },
-  appHeaderSub: { fontSize: '11px', color: 'rgba(196,181,253,0.28)', textAlign: 'center', flex: 1 },
+  appHeaderSub: { fontSize: '11px', color: '#64748b', textAlign: 'center', flex: 1, fontWeight: '600' },
   appTitle: {
     fontSize: '16px', fontWeight: '800', letterSpacing: '-0.035em', lineHeight: 1.2,
-    background: 'linear-gradient(135deg, #e8e0ff 0%, #a78bfa 100%)',
+    background: 'linear-gradient(135deg, #0f172a 0%, #334155 100%)',
     WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent',
   },
-  appSubtitle: { fontSize: '11px', color: 'rgba(139,92,246,0.42)', marginTop: '2px', letterSpacing: '-0.01em' },
+  appSubtitle: { fontSize: '11px', color: '#64748b', marginTop: '2px', letterSpacing: '-0.01em', fontWeight: '500' },
   iconBtn: {
-    background: 'rgba(139,92,246,0.09)', border: '1px solid rgba(139,92,246,0.2)',
-    borderRadius: '13px', color: 'rgba(196,181,253,0.55)',
+    background: 'rgba(255,255,255,0.5)', border: '1px solid rgba(148,163,184,0.3)',
+    borderRadius: '13px', color: '#334155',
     fontSize: '16px', cursor: 'pointer',
     width: '38px', height: '38px',
     display: 'flex', alignItems: 'center', justifyContent: 'center',
@@ -1137,31 +1127,29 @@ const s = {
   },
   avatarChip: {
     width: '36px', height: '36px', borderRadius: '50%', flexShrink: 0,
-    background: 'linear-gradient(135deg, #9d71ff, #6d28d9)',
+    background: 'linear-gradient(135deg, #22d3ee, #0ea5e9)',
     display: 'flex', alignItems: 'center', justifyContent: 'center',
-    fontSize: '13px', fontWeight: '700', color: '#fff',
-    boxShadow: '0 0 20px rgba(139,92,246,0.6), 0 0 0 2px rgba(139,92,246,0.28)',
-    animation: 'pulseGlow 4s ease-in-out infinite',
+    fontSize: '13px', fontWeight: '800', color: '#fff',
+    boxShadow: '0 2px 8px rgba(6,182,212,0.4), 0 0 0 2px rgba(255,255,255,0.8)',
   },
-
-  // ── User / DM List ─────────────────────────────────────────
   searchWrap: {
     display: 'flex', alignItems: 'center', gap: '10px', padding: '10px 20px',
-    borderBottom: '1px solid rgba(139,92,246,0.08)',
-    background: 'rgba(139,92,246,0.025)',
+    borderBottom: '1px solid rgba(148,163,184,0.1)',
+    background: 'rgba(255,255,255,0.3)',
   },
-  searchIcon: { color: 'rgba(139,92,246,0.45)', fontSize: '18px', flexShrink: 0 },
+  searchIcon: { color: '#94a3b8', fontSize: '18px', flexShrink: 0 },
   searchField: {
     flex: 1, background: 'none', border: 'none', outline: 'none',
-    color: '#f0eaff', fontSize: '14px', padding: '4px 0', letterSpacing: '-0.01em',
+    color: '#0f172a', fontSize: '14px', padding: '4px 0', letterSpacing: '-0.01em',
+    fontWeight: '500',
   },
   clearBtn: {
-    background: 'none', border: 'none', color: 'rgba(196,181,253,0.3)',
+    background: 'none', border: 'none', color: '#94a3b8',
     cursor: 'pointer', fontSize: '14px', padding: '4px', transition: 'color 0.18s',
   },
   listArea: { flex: 1, overflowY: 'auto', padding: '8px 12px' },
   listSection: {
-    fontSize: '10px', fontWeight: '700', color: 'rgba(139,92,246,0.42)',
+    fontSize: '10px', fontWeight: '800', color: '#94a3b8',
     textTransform: 'uppercase', letterSpacing: '0.1em', padding: '14px 8px 6px',
   },
   dmRow: {
@@ -1170,55 +1158,48 @@ const s = {
     cursor: 'pointer', transition: 'all 0.18s', marginBottom: '3px',
   },
   dmRowUnread: {
-    background: 'rgba(139,92,246,0.09)',
-    boxShadow: 'inset 0 0 0 1px rgba(139,92,246,0.16)',
+    background: 'rgba(255,255,255,0.6)',
+    boxShadow: '0 2px 8px rgba(0,0,0,0.02), inset 0 0 0 1px rgba(6,182,212,0.3)',
   },
   dmRowBody: { flex: 1, minWidth: 0 },
   dmRowTop: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '3px' },
   dmRowBottom: { display: 'flex', justifyContent: 'space-between', alignItems: 'center' },
-  dmRowName: { fontSize: '14px', fontWeight: '600', color: '#f0eaff', letterSpacing: '-0.02em' },
-  dmRowMeta: { fontSize: '12px', color: 'rgba(196,181,253,0.32)' },
-  dmRowTime: { fontSize: '11px', color: 'rgba(139,92,246,0.38)', flexShrink: 0 },
+  dmRowName: { fontSize: '14px', fontWeight: '700', color: '#0f172a', letterSpacing: '-0.02em' },
+  dmRowMeta: { fontSize: '12px', color: '#64748b' },
+  dmRowTime: { fontSize: '11px', color: '#94a3b8', flexShrink: 0, fontWeight: '600' },
   dmRowPreview: {
-    fontSize: '12px', color: 'rgba(196,181,253,0.32)', overflow: 'hidden',
+    fontSize: '12px', color: '#64748b', overflow: 'hidden',
     textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1,
   },
   dmRowAction: {
-    background: 'rgba(139,92,246,0.1)', border: '1px solid rgba(139,92,246,0.2)',
-    borderRadius: '10px', padding: '5px 13px', fontSize: '12px',
-    color: 'rgba(196,181,253,0.65)', flexShrink: 0, transition: 'all 0.18s',
+    background: 'rgba(255,255,255,0.6)', border: '1px solid rgba(148,163,184,0.3)',
+    borderRadius: '10px', padding: '5px 13px', fontSize: '12px', fontWeight: '600',
+    color: '#334155', flexShrink: 0, transition: 'all 0.18s',
     cursor: 'pointer',
   },
   unreadCircle: {
-    background: 'linear-gradient(135deg, #8b5cf6, #6d28d9)', color: '#fff',
+    background: 'linear-gradient(135deg, #06b6d4, #0891b2)', color: '#fff',
     borderRadius: '99px', minWidth: '20px', height: '20px', padding: '0 6px',
     display: 'flex', alignItems: 'center', justifyContent: 'center',
-    fontSize: '11px', fontWeight: '700', flexShrink: 0, marginLeft: '8px',
-    boxShadow: '0 0 14px rgba(139,92,246,0.7)',
+    fontSize: '11px', fontWeight: '800', flexShrink: 0, marginLeft: '8px',
+    boxShadow: '0 2px 6px rgba(6,182,212,0.4)',
   },
-
-  // ── Empty States ──────────────────────────────────────────
   emptyState: {
     display: 'flex', flexDirection: 'column', alignItems: 'center',
     justifyContent: 'center', flex: 1, gap: '12px', padding: '60px 20px',
   },
-  emptyEmoji: { fontSize: '48px', opacity: 0.18, marginBottom: '4px' },
-  emptyTitle: { fontSize: '16px', fontWeight: '700', color: 'rgba(196,181,253,0.35)', letterSpacing: '-0.02em' },
-  emptyDesc: { fontSize: '13px', color: 'rgba(196,181,253,0.18)', textAlign: 'center', maxWidth: '240px' },
-  emptyHint: { fontSize: '13px', color: 'rgba(139,92,246,0.3)', padding: '20px', textAlign: 'center' },
-
-  // ── E2E Banner ────────────────────────────────────────────
+  emptyEmoji: { fontSize: '48px', opacity: 0.8, marginBottom: '4px' },
+  emptyTitle: { fontSize: '16px', fontWeight: '800', color: '#334155', letterSpacing: '-0.02em' },
+  emptyDesc: { fontSize: '13px', color: '#64748b', textAlign: 'center', maxWidth: '240px' },
+  emptyHint: { fontSize: '13px', color: '#64748b', padding: '20px', textAlign: 'center', fontWeight: '500' },
   e2eBanner: {
     display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px',
-    padding: '7px 20px', fontSize: '11px', color: 'rgba(167,139,250,0.75)',
-    background: 'linear-gradient(90deg, rgba(139,92,246,0.06), rgba(109,40,217,0.02) 50%, rgba(139,92,246,0.06))',
-    borderBottom: '1px solid rgba(139,92,246,0.1)', flexShrink: 0,
+    padding: '7px 20px', fontSize: '11px', color: '#0369a1', fontWeight: '600',
+    background: 'linear-gradient(90deg, rgba(6,182,212,0.1), rgba(14,165,233,0.05) 50%, rgba(6,182,212,0.1))',
+    borderBottom: '1px solid rgba(6,182,212,0.2)', flexShrink: 0,
     letterSpacing: '-0.01em',
   },
   e2eBannerDot: { fontSize: '13px' },
-
-
-  // ── Messages ──────────────────────────────────────────────
   msgArea: {
     flex: 1, overflowY: 'auto', padding: '20px 24px',
     display: 'flex', flexDirection: 'column', gap: '8px',
@@ -1236,125 +1217,119 @@ const s = {
   },
   msgBubbleWrap: { maxWidth: '72%', display: 'flex', flexDirection: 'column' },
   senderRow: { display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '4px' },
-  senderName: { fontSize: '12px', fontWeight: '600', color: '#a78bfa', cursor: 'pointer', letterSpacing: '-0.01em' },
+  senderName: { fontSize: '12px', fontWeight: '700', color: '#0891b2', cursor: 'pointer', letterSpacing: '-0.01em' },
   onlineTag: { fontSize: '10px' },
   bubbleMine: {
-    background: 'linear-gradient(135deg, #9d71ff 0%, #7c3aed 100%)',
+    background: 'linear-gradient(135deg, #06b6d4 0%, #0284c7 100%)',
     color: '#fff', padding: '12px 16px',
     borderRadius: '22px 22px 6px 22px',
     fontSize: '14px', lineHeight: '1.58', wordBreak: 'break-word',
     letterSpacing: '-0.01em',
-    boxShadow: '0 8px 32px rgba(139,92,246,0.48), 0 1px 0 rgba(255,255,255,0.2) inset',
+    boxShadow: '0 4px 12px rgba(6,182,212,0.3), 0 1px 0 rgba(255,255,255,0.2) inset',
     position: 'relative', transition: 'filter 0.2s',
   },
   bubbleTheirs: {
-    background: 'rgba(255,255,255,0.07)',
-    border: '1px solid rgba(255,255,255,0.10)',
+    background: 'rgba(255,255,255,0.85)',
+    border: '1px solid rgba(255,255,255,1)',
     backdropFilter: 'blur(24px)', WebkitBackdropFilter: 'blur(24px)',
-    color: '#f0eaff', padding: '12px 16px',
+    color: '#0f172a', padding: '12px 16px',
     borderRadius: '22px 22px 22px 6px',
     fontSize: '14px', lineHeight: '1.58', wordBreak: 'break-word',
     letterSpacing: '-0.01em',
-    boxShadow: '0 6px 28px rgba(0,0,0,0.32), 0 1px 0 rgba(255,255,255,0.07) inset',
+    boxShadow: '0 4px 12px rgba(0,0,0,0.04), 0 1px 0 rgba(255,255,255,0.5) inset',
     transition: 'background 0.2s',
   },
   msgMeta: {
-    fontSize: '10px', color: 'rgba(196,181,253,0.32)',
+    fontSize: '10px', color: 'rgba(255, 255, 255, 0.8)',
     marginTop: '5px', display: 'flex', alignItems: 'center', gap: '4px',
   },
-  expiryTag: { color: 'rgba(248,113,113,0.6)' },
+  expiryTag: { color: 'rgba(239,68,68,0.8)' },
   typingBar: {
     display: 'flex', alignItems: 'center', gap: '8px',
     padding: '6px 20px 2px', fontSize: '12px',
-    color: 'rgba(139,92,246,0.48)', flexShrink: 0, letterSpacing: '-0.01em',
+    color: '#64748b', flexShrink: 0, letterSpacing: '-0.01em', fontWeight: '500',
   },
   typingDots: { display: 'flex', gap: '3px' },
-
-  // ── Input Bar ─────────────────────────────────────────────
   inputBar: {
     display: 'flex', alignItems: 'center', gap: '10px',
     padding: '12px 18px 20px',
-    borderTop: '1px solid rgba(139,92,246,0.1)',
-    background: 'rgba(6,4,15,0.92)',
-    backdropFilter: 'blur(48px)', WebkitBackdropFilter: 'blur(48px)',
+    borderTop: '1px solid rgba(255,255,255,0.6)',
+    background: 'rgba(255,255,255,0.7)',
+    backdropFilter: 'blur(20px)', WebkitBackdropFilter: 'blur(20px)',
     flexShrink: 0, position: 'relative', zIndex: 20,
-    boxShadow: '0 -1px 0 rgba(139,92,246,0.08), 0 -8px 32px rgba(0,0,0,0.3)',
+    boxShadow: '0 -2px 10px rgba(0,0,0,0.02)',
   },
   msgInput: {
-    flex: 1, background: 'rgba(139,92,246,0.09)',
-    border: '1px solid rgba(139,92,246,0.2)',
+    flex: 1, background: 'rgba(255,255,255,0.8)',
+    border: '1px solid rgba(148,163,184,0.3)',
     borderRadius: '20px', padding: '13px 20px',
-    color: '#f0eaff', fontSize: '14px', outline: 'none',
+    color: '#0f172a', fontSize: '14px', outline: 'none',
     letterSpacing: '-0.01em', lineHeight: 1.45,
-    boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.05)',
+    boxShadow: 'inset 0 2px 4px rgba(0,0,0,0.02)',
     transition: 'border-color 0.22s, box-shadow 0.22s',
   },
   attachIconBtn: {
     width: '44px', height: '44px', borderRadius: '14px', flexShrink: 0,
-    background: 'rgba(139,92,246,0.09)', border: '1px solid rgba(139,92,246,0.2)',
-    color: 'rgba(196,181,253,0.55)', fontSize: '20px', cursor: 'pointer',
+    background: 'rgba(255,255,255,0.8)', border: '1px solid rgba(148,163,184,0.3)',
+    color: '#64748b', fontSize: '20px', cursor: 'pointer',
     display: 'flex', alignItems: 'center', justifyContent: 'center',
     transition: 'all 0.22s',
   },
   sendBtn: {
     width: '44px', height: '44px', borderRadius: '14px', flexShrink: 0,
-    background: 'linear-gradient(135deg, #9d71ff 0%, #6d28d9 100%)',
+    background: 'linear-gradient(135deg, #06b6d4 0%, #0891b2 100%)',
     border: 'none', color: '#fff', fontSize: '18px', cursor: 'pointer',
     display: 'flex', alignItems: 'center', justifyContent: 'center',
-    boxShadow: '0 6px 26px rgba(139,92,246,0.65), 0 0 0 1px rgba(255,255,255,0.12) inset',
+    boxShadow: '0 4px 14px rgba(6,182,212,0.4), 0 0 0 1px rgba(255,255,255,0.2) inset',
     transition: 'all 0.22s',
   },
   sendBtnOff: {
     width: '44px', height: '44px', borderRadius: '14px', flexShrink: 0,
-    background: 'rgba(255,255,255,0.04)',
-    border: '1px solid rgba(255,255,255,0.07)',
-    color: 'rgba(255,255,255,0.16)', fontSize: '18px', cursor: 'not-allowed',
+    background: 'rgba(148,163,184,0.2)',
+    border: '1px solid rgba(148,163,184,0.2)',
+    color: 'rgba(100,116,139,0.5)', fontSize: '18px', cursor: 'not-allowed',
     display: 'flex', alignItems: 'center', justifyContent: 'center',
   },
-
-  // ── Chat Misc ─────────────────────────────────────────────
   roomPill: {
-    background: 'linear-gradient(135deg, rgba(139,92,246,0.22), rgba(109,40,217,0.08))',
-    border: '1px solid rgba(139,92,246,0.35)', borderRadius: '11px',
-    padding: '4px 13px', fontSize: '12px', color: '#c4b5fd', fontWeight: '700',
+    background: 'linear-gradient(135deg, #e0f2fe, #cffafe)',
+    border: '1px solid rgba(6,182,212,0.3)', borderRadius: '11px',
+    padding: '4px 13px', fontSize: '12px', color: '#0369a1', fontWeight: '800',
     flexShrink: 0, fontFamily: "'JetBrains Mono', monospace",
-    boxShadow: '0 0 16px rgba(139,92,246,0.25)',
+    boxShadow: '0 2px 6px rgba(6,182,212,0.15)',
   },
   dmBtn: {
-    background: 'linear-gradient(135deg, rgba(139,92,246,0.15), rgba(109,40,217,0.07))',
-    border: '1px solid rgba(139,92,246,0.3)', borderRadius: '13px',
-    padding: '7px 15px', color: '#c4b5fd', fontSize: '13px', cursor: 'pointer',
-    display: 'flex', alignItems: 'center', gap: '6px', fontWeight: '600',
-    boxShadow: '0 0 18px rgba(139,92,246,0.22)', transition: 'all 0.2s',
+    background: 'linear-gradient(135deg, rgba(255,255,255,0.8), rgba(255,255,255,0.6))',
+    border: '1px solid rgba(148,163,184,0.3)', borderRadius: '13px',
+    padding: '7px 15px', color: '#0f172a', fontSize: '13px', cursor: 'pointer',
+    display: 'flex', alignItems: 'center', gap: '6px', fontWeight: '700',
+    boxShadow: '0 2px 4px rgba(0,0,0,0.02)', transition: 'all 0.2s',
     letterSpacing: '-0.01em',
   },
   dmBadge: {
-    background: 'linear-gradient(135deg, #8b5cf6, #6d28d9)', color: '#fff',
-    borderRadius: '99px', padding: '1px 7px', fontSize: '11px', fontWeight: '700',
-    boxShadow: '0 0 10px rgba(139,92,246,0.6)',
+    background: 'linear-gradient(135deg, #06b6d4, #0891b2)', color: '#fff',
+    borderRadius: '99px', padding: '1px 7px', fontSize: '11px', fontWeight: '800',
+    boxShadow: '0 2px 6px rgba(6,182,212,0.4)',
   },
   toastBar: {
     display: 'flex', alignItems: 'center', gap: '10px', padding: '14px 22px',
-    background: 'linear-gradient(90deg, rgba(109,40,217,0.98), rgba(139,92,246,0.98))',
-    color: '#fff', fontSize: '13px', fontWeight: '600',
+    background: 'linear-gradient(90deg, rgba(6,182,212,0.95), rgba(8,145,178,0.95))',
+    color: '#fff', fontSize: '13px', fontWeight: '700',
     cursor: 'pointer', position: 'fixed', top: 0, left: 0, right: 0, zIndex: 2000,
     animation: 'toastIn 0.34s cubic-bezier(0.34,1.56,0.64,1)',
-    boxShadow: '0 6px 40px rgba(139,92,246,0.6)',
-    backdropFilter: 'blur(30px)', WebkitBackdropFilter: 'blur(30px)',
+    boxShadow: '0 6px 20px rgba(6,182,212,0.4)',
+    backdropFilter: 'blur(20px)', WebkitBackdropFilter: 'blur(20px)',
     letterSpacing: '-0.01em',
   },
   toastDot: { fontSize: '16px' },
-  toastAction: { marginLeft: 'auto', fontWeight: '700', opacity: 0.88 },
-
-  // ── Media ─────────────────────────────────────────────────
+  toastAction: { marginLeft: 'auto', fontWeight: '800', opacity: 0.9 },
   mediaImage: {
     maxWidth: '100%', maxHeight: '260px', borderRadius: '18px',
     cursor: 'pointer', display: 'block',
-    boxShadow: '0 10px 40px rgba(0,0,0,0.55)', border: '1px solid rgba(255,255,255,0.06)',
+    boxShadow: '0 4px 16px rgba(0,0,0,0.1)', border: '1px solid rgba(255,255,255,0.8)',
   },
   mediaVideo: { maxWidth: '100%', maxHeight: '260px', borderRadius: '18px', display: 'block' },
   mediaAudio: { width: '100%', borderRadius: '12px' },
-  fileLink: { color: '#a78bfa', textDecoration: 'none', fontWeight: '600', fontSize: '13px' },
+  fileLink: { color: '#0891b2', textDecoration: 'none', fontWeight: '700', fontSize: '13px' },
 };
 
 export default App;
