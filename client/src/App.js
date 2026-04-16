@@ -732,8 +732,8 @@ function App() {
           </div>
           <div>
             <div style={s.appTitle}>{privateUser}</div>
-            <div style={{...s.appSubtitle, color: isOnline(privateUser) ? '#00e5a0' : 'rgba(255,255,255,0.35)'}}>
-              {isOnline(privateUser) ? '● Online' : '○ Offline'} · 🔒 E2E · 5min delete
+            <div style={{...s.appSubtitle, color: isOnline(privateUser) ? '#0891b2' : '#64748b'}}>
+              {isOnline(privateUser) ? '● Online' : '○ Offline'}
             </div>
           </div>
         </div>
@@ -741,16 +741,13 @@ function App() {
           <button style={s.iconBtn} onClick={handleLogout}>⏻</button>
         </div>
       </div>
-      <div style={s.e2eBanner}>
-        <span style={s.e2eBannerDot}>🔐</span>
-        AES-256 encrypted · Messages delete 5 min after reading · Only you & {privateUser}
-      </div>
+
       <div style={s.msgArea}>
         {privateMessages.length === 0 && (
           <div style={s.emptyState}>
-            <div style={s.emptyEmoji}>🔐</div>
-            <div style={s.emptyTitle}>Encrypted conversation</div>
-            <div style={s.emptyDesc}>5-minute countdown begins when {privateUser} reads your message</div>
+            <div style={s.emptyEmoji}>💬</div>
+            <div style={s.emptyTitle}>Start a conversation</div>
+            <div style={s.emptyDesc}>Say hello to {privateUser}</div>
           </div>
         )}
         {privateMessages.map((m, i) => {
