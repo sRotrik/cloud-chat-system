@@ -416,90 +416,7 @@ function App() {
   const totalUnread = conversations.reduce((acc, c) => acc + getUnreadCount(c), 0);
   const isOnline = (uname) => onlineUsersList.includes(uname);
 
-  const InteractiveRawMessage = ({ m, mine, s, isPrivate, renderMedia, openPrivateChat, isOnline, onDelete, onForward, onReact, username }) => {
-    const [showMenu, setShowMenu] = useState(false);
-    const holdTimer = useRef(null);
 
-    const handleDown = () => { holdTimer.current = setTimeout(() => setShowMenu(true), 500); };
-    const handleUp = () => clearTimeout(holdTimer.current);
-
-    return (
-      <div style={{...(mine ? s.msgRowMine : s.msgRowTheirs), position: 'relative'}}
-        onMouseDown={handleDown} onMouseUp={handleUp} onTouchStart={handleDown} onTouchEnd={handleUp}
-        onContextMenu={(e) => { e.preventDefault(); setShowMenu(true); }}>
-        
-        {!mine && isPrivate && <Avatar name={m.from} size={28} />}
-        {!mine && !isPrivate && (
-          <div style={{ position: 'relative', flexShrink: 0, cursor: 'pointer' }}
-            onClick={() => openPrivateChat && openPrivateChat(m.username)}>
-            <Avatar name={m.username} size={28} />
-            {isOnline && <OnlineDot isOnline={isOnline(m.username)} />}
-          </div>
-        )}
-
-        <div style={{...s.msgBubbleWrap, position: 'relative'}}>
-          {!mine && !isPrivate && <div onClick={() => openPrivateChat && openPrivateChat(m.username)} style={{fontSize:'12px',color:'#ccc',cursor:'pointer',marginBottom:'2px'}}>{m.username}</div>}
-          <div style={{...(mine ? s.bubbleMine : s.bubbleTheirs), opacity: m.temp ? 0.6 : 1}}>
-            {m.type === 'voice' ? <VoicePlayer msg={m} isOwn={mine} /> : (m.fileUrl ? renderMedia(m) : (m.message || m.text))}
-          </div>
-          <div style={s.msgMeta}>
-            {m.temp ? '⏳ Sending…' : new Date(m.timestamp || m.createdAt).toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'})}
-            {isPrivate && m.expiresAt && !m.temp && (
-              <span style={s.expiryTag}>· 🔥 {new Date(m.expiresAt).toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'})}</span>
-            )}
-          </div>
-          
-          {!isPrivate && m.reactions && Object.keys(m.reactions).length > 0 && (
-            <div style={{display:'flex', flexWrap:'wrap', gap:'2px', position:'absolute', bottom:'-10px', [mine ? 'left' : 'right']:'10px', zIndex:5}}>
-              {Object.entries(m.reactions).map(([emoji, reaction]) => reaction && reaction.count > 0 && (
-                <div key={emoji} style={{display:'flex', alignItems:'center', gap:'2px', background: reaction.users?.includes(username) ? '#e3f2fd' : '#f0f0f0', border:`1.5px solid ${reaction.users?.includes(username) ? '#90caf9' : '#fff'}`, borderRadius:'12px', padding:'2px 5px', fontSize:'11px', cursor:'pointer', boxShadow:'0 1px 2px rgba(0,0,0,0.1)'}} onClick={(e) => { e.stopPropagation(); if(onReact) onReact({messageId: m._id, emoji}); }}>
-                  <span>{emoji}</span>
-                  <span style={{fontSize:'10px', fontWeight:600, color:'#555'}}>{reaction.count}</span>
-                </div>
-              ))}
-            </div>
-          )}
-
-          {showMenu && (
-            <div className="context-menu" style={{position: 'absolute', top: '50%', transform:'translateY(-50%)', [mine ? 'right' : 'left']: '105%', minWidth:'150px', zIndex: 10, background: '#1a1a20', padding: '8px', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.1)'}} onMouseLeave={() => setShowMenu(false)}>
-              {!isPrivate && (
-                <div style={{display:'flex', gap:'4px', marginBottom:'8px', paddingBottom:'8px', borderBottom:'1px solid rgba(255,255,255,0.1)', justifyContent:'center'}}>
-                  {['👍', '❤️', '😂', '😮', '😢', '🔥'].map(e => (
-                    <button key={e} style={{background:'none', border:'none', fontSize:'18px', cursor:'pointer'}} onClick={() => { if(onReact) onReact({messageId: m._id, emoji: e}); setShowMenu(false); }}>{e}</button>
-                  ))}
-                </div>
-              )}
-              <div className="menu-actions" style={{display: 'flex', flexDirection: 'column', gap: '4px'}}>
-                <button style={{background: 'none', border: 'none', color: '#fff', textAlign: 'left', cursor: 'pointer', fontSize: '13px'}} onClick={() => { if(onForward) onForward(m); setShowMenu(false); }}>➡ Forward</button>
-                <button style={{background: 'none', border: 'none', color: '#fff', textAlign: 'left', cursor: 'pointer', fontSize: '13px'}} onClick={() => { navigator.clipboard.writeText(m.message || m.text || ''); setShowMenu(false); }}>📋 Copy</button>
-                {mine && <button style={{background: 'none', border: 'none', color: '#ff8a8a', textAlign: 'left', cursor: 'pointer', fontSize: '13px'}} onClick={() => { if(onDelete) onDelete(m._id || m.timestamp, true); setShowMenu(false); }}>🗑 Delete for everyone</button>}
-                <button style={{background: 'none', border: 'none', color: '#ff8a8a', textAlign: 'left', cursor: 'pointer', fontSize: '13px'}} onClick={() => { if(onDelete) onDelete(m._id || m.timestamp, false); setShowMenu(false); }}>🗑 Delete for me</button>
-              </div>
-            </div>
-          )}
-        </div>
-        {mine && <Avatar name={username} size={28} gradient />}
-      </div>
-    );
-  };
-
-  const AuthShell = ({ children }) => (
-    <div style={s.authBg}>
-      <style>{CSS}</style>
-      <div style={s.authNoise} />
-      <div style={s.authGlow1} />
-      <div style={s.authGlow2} />
-      <div style={s.authCard}>{children}</div>
-    </div>
-  );
-
-  const LogoMark = ({ subtitle }) => (
-    <div style={{ textAlign: 'center', marginBottom: '8px' }}>
-      <div style={s.logoMark}><span style={{ fontSize: '20px' }}>☁</span></div>
-      <div style={s.brandName}>CloudChat</div>
-      {subtitle && <div style={s.brandSub}>{subtitle}</div>}
-    </div>
-  );
 
   if (screen === 'login') return (
     <AuthShell>
@@ -1328,5 +1245,90 @@ const s = {
   mediaAudio: { width: '100%', borderRadius: '12px' },
   fileLink: { color: '#0891b2', textDecoration: 'none', fontWeight: '700', fontSize: '13px' },
 };
+
+  const InteractiveRawMessage = ({ m, mine, s, isPrivate, renderMedia, openPrivateChat, isOnline, onDelete, onForward, onReact, username }) => {
+    const [showMenu, setShowMenu] = useState(false);
+    const holdTimer = useRef(null);
+
+    const handleDown = () => { holdTimer.current = setTimeout(() => setShowMenu(true), 500); };
+    const handleUp = () => clearTimeout(holdTimer.current);
+
+    return (
+      <div style={{...(mine ? s.msgRowMine : s.msgRowTheirs), position: 'relative'}}
+        onMouseDown={handleDown} onMouseUp={handleUp} onTouchStart={handleDown} onTouchEnd={handleUp}
+        onContextMenu={(e) => { e.preventDefault(); setShowMenu(true); }}>
+        
+        {!mine && isPrivate && <Avatar name={m.from} size={28} />}
+        {!mine && !isPrivate && (
+          <div style={{ position: 'relative', flexShrink: 0, cursor: 'pointer' }}
+            onClick={() => openPrivateChat && openPrivateChat(m.username)}>
+            <Avatar name={m.username} size={28} />
+            {isOnline && <OnlineDot isOnline={isOnline(m.username)} />}
+          </div>
+        )}
+
+        <div style={{...s.msgBubbleWrap, position: 'relative'}}>
+          {!mine && !isPrivate && <div onClick={() => openPrivateChat && openPrivateChat(m.username)} style={{fontSize:'12px',color:'#ccc',cursor:'pointer',marginBottom:'2px'}}>{m.username}</div>}
+          <div style={{...(mine ? s.bubbleMine : s.bubbleTheirs), opacity: m.temp ? 0.6 : 1}}>
+            {m.type === 'voice' ? <VoicePlayer msg={m} isOwn={mine} /> : (m.fileUrl ? renderMedia(m) : (m.message || m.text))}
+          </div>
+          <div style={s.msgMeta}>
+            {m.temp ? '⏳ Sending…' : new Date(m.timestamp || m.createdAt).toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'})}
+            {isPrivate && m.expiresAt && !m.temp && (
+              <span style={s.expiryTag}>· 🔥 {new Date(m.expiresAt).toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'})}</span>
+            )}
+          </div>
+          
+          {!isPrivate && m.reactions && Object.keys(m.reactions).length > 0 && (
+            <div style={{display:'flex', flexWrap:'wrap', gap:'2px', position:'absolute', bottom:'-10px', [mine ? 'left' : 'right']:'10px', zIndex:5}}>
+              {Object.entries(m.reactions).map(([emoji, reaction]) => reaction && reaction.count > 0 && (
+                <div key={emoji} style={{display:'flex', alignItems:'center', gap:'2px', background: reaction.users?.includes(username) ? '#e3f2fd' : '#f0f0f0', border:`1.5px solid ${reaction.users?.includes(username) ? '#90caf9' : '#fff'}`, borderRadius:'12px', padding:'2px 5px', fontSize:'11px', cursor:'pointer', boxShadow:'0 1px 2px rgba(0,0,0,0.1)'}} onClick={(e) => { e.stopPropagation(); if(onReact) onReact({messageId: m._id, emoji}); }}>
+                  <span>{emoji}</span>
+                  <span style={{fontSize:'10px', fontWeight:600, color:'#555'}}>{reaction.count}</span>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {showMenu && (
+            <div className="context-menu" style={{position: 'absolute', top: '50%', transform:'translateY(-50%)', [mine ? 'right' : 'left']: '105%', minWidth:'150px', zIndex: 10, background: '#1a1a20', padding: '8px', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.1)'}} onMouseLeave={() => setShowMenu(false)}>
+              {!isPrivate && (
+                <div style={{display:'flex', gap:'4px', marginBottom:'8px', paddingBottom:'8px', borderBottom:'1px solid rgba(255,255,255,0.1)', justifyContent:'center'}}>
+                  {['👍', '❤️', '😂', '😮', '😢', '🔥'].map(e => (
+                    <button key={e} style={{background:'none', border:'none', fontSize:'18px', cursor:'pointer'}} onClick={() => { if(onReact) onReact({messageId: m._id, emoji: e}); setShowMenu(false); }}>{e}</button>
+                  ))}
+                </div>
+              )}
+              <div className="menu-actions" style={{display: 'flex', flexDirection: 'column', gap: '4px'}}>
+                <button style={{background: 'none', border: 'none', color: '#fff', textAlign: 'left', cursor: 'pointer', fontSize: '13px'}} onClick={() => { if(onForward) onForward(m); setShowMenu(false); }}>➡ Forward</button>
+                <button style={{background: 'none', border: 'none', color: '#fff', textAlign: 'left', cursor: 'pointer', fontSize: '13px'}} onClick={() => { navigator.clipboard.writeText(m.message || m.text || ''); setShowMenu(false); }}>📋 Copy</button>
+                {mine && <button style={{background: 'none', border: 'none', color: '#ff8a8a', textAlign: 'left', cursor: 'pointer', fontSize: '13px'}} onClick={() => { if(onDelete) onDelete(m._id || m.timestamp, true); setShowMenu(false); }}>🗑 Delete for everyone</button>}
+                <button style={{background: 'none', border: 'none', color: '#ff8a8a', textAlign: 'left', cursor: 'pointer', fontSize: '13px'}} onClick={() => { if(onDelete) onDelete(m._id || m.timestamp, false); setShowMenu(false); }}>🗑 Delete for me</button>
+              </div>
+            </div>
+          )}
+        </div>
+        {mine && <Avatar name={username} size={28} gradient />}
+      </div>
+    );
+  };
+
+  const AuthShell = ({ children }) => (
+    <div style={s.authBg}>
+      <style>{CSS}</style>
+      <div style={s.authNoise} />
+      <div style={s.authGlow1} />
+      <div style={s.authGlow2} />
+      <div style={s.authCard}>{children}</div>
+    </div>
+  );
+
+  const LogoMark = ({ subtitle }) => (
+    <div style={{ textAlign: 'center', marginBottom: '8px' }}>
+      <div style={s.logoMark}><span style={{ fontSize: '20px' }}>☁</span></div>
+      <div style={s.brandName}>CloudChat</div>
+      {subtitle && <div style={s.brandSub}>{subtitle}</div>}
+    </div>
+  );
 
 export default App;
