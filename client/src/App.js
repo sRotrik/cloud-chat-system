@@ -576,7 +576,7 @@ function App() {
             <div style={s.homeCardIconWrap}><span style={{ fontSize: '22px' }}>💬</span></div>
             <div style={s.homeCardBody}>
               <div style={s.homeCardTitle}>Group Rooms</div>
-              <div style={s.homeCardMeta}>4 rooms • real-time • reactions • voice</div>
+              <div style={s.homeCardMeta}>4 rooms · Real-time messaging · Open to all</div>
             </div>
             <div style={s.homeCardChevron}>›</div>
           </div>
@@ -590,17 +590,13 @@ function App() {
                 Private Messages
                 {totalUnread > 0 && <span style={s.unreadPill}>{totalUnread}</span>}
               </div>
-              <div style={s.homeCardMeta}>E2E encrypted • 5min delete • media</div>
+              <div style={s.homeCardMeta}>End-to-end encrypted · Auto-expiring · Secure</div>
             </div>
             <div style={s.homeCardChevron}>›</div>
           </div>
         </div>
         <button style={s.signOutBtn} onClick={handleLogout}>Sign out</button>
-        <div style={s.techBadgeRow}>
-          {['WebSocket','Redis','MongoDB','Docker','JWT','E2E','Reactions','Voice'].map(t => (
-            <span key={t} style={s.techBadge}>{t}</span>
-          ))}
-        </div>
+        <div style={s.versionBadge}>CloudChat v2.0</div>
       </div>
     </div>
   );
@@ -814,7 +810,7 @@ function App() {
             <div style={s.appTitle}>{room.charAt(0).toUpperCase() + room.slice(1)}</div>
             <div style={s.appSubtitle}>
               <span style={{color: connected ? '#00e5a0' : '#ff6b6b'}}>●</span>
-              {' '}{onlineUsers} online · reactions · voice · search
+              {' '}{onlineUsers} {onlineUsers === 1 ? 'member' : 'members'} online
             </div>
           </div>
         </div>
@@ -833,11 +829,7 @@ function App() {
         </div>
       </div>
 
-      <div style={s.techStrip}>
-        {['⚡ WebSocket','🔴 Redis','🍃 MongoDB','🐳 Docker','👍 Reactions','✓✓ Read Receipts','↩ Reply','🔍 Search','🎤 Voice'].map(t => (
-          <span key={t} style={s.techTag}>{t}</span>
-        ))}
-      </div>
+
 
       <div style={s.msgArea}>
         {messages.length === 0 && (
@@ -1085,10 +1077,9 @@ const s = {
     cursor: 'pointer', padding: '12px', width: '100%', transition: 'all 0.22s',
     letterSpacing: '-0.01em',
   },
-  techBadgeRow: { display: 'flex', flexWrap: 'wrap', gap: '6px', justifyContent: 'center' },
-  techBadge: {
-    background: 'rgba(139,92,246,0.07)', border: '1px solid rgba(139,92,246,0.14)',
-    borderRadius: '99px', padding: '3px 11px', fontSize: '11px', color: 'rgba(196,181,253,0.55)',
+  versionBadge: {
+    textAlign: 'center', fontSize: '11px', color: 'rgba(196,181,253,0.22)',
+    letterSpacing: '0.05em', marginTop: '2px',
   },
 
   // ── Room Select ───────────────────────────────────────────
@@ -1226,16 +1217,6 @@ const s = {
   },
   e2eBannerDot: { fontSize: '13px' },
 
-  // ── Tech Strip ────────────────────────────────────────────
-  techStrip: {
-    display: 'flex', gap: '6px', padding: '8px 20px',
-    overflowX: 'auto', borderBottom: '1px solid rgba(139,92,246,0.07)', flexShrink: 0,
-  },
-  techTag: {
-    background: 'rgba(139,92,246,0.055)', borderRadius: '99px', padding: '3px 11px',
-    fontSize: '11px', color: 'rgba(196,181,253,0.4)', whiteSpace: 'nowrap',
-    border: '1px solid rgba(139,92,246,0.11)', letterSpacing: '-0.01em',
-  },
 
   // ── Messages ──────────────────────────────────────────────
   msgArea: {

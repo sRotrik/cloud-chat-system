@@ -53,7 +53,7 @@ export default function VoicePlayer({ msg, isOwn }) {
           {bars.map((h, i) => (
             <div key={i} className="vp-bar" style={{ 
               height: `${Math.max(10, Math.min(100, h * 10))}%`,
-              backgroundColor: (i / 30) * 100 <= progress ? '#00a884' : ''
+              backgroundColor: (i / 30) * 100 <= progress ? '#9d71ff' : undefined
             }} />
           ))}
         </div>
