@@ -1,68 +1,82 @@
-/* ReplyBar.css — Glassmorphism Dark Theme */
+/* ReplyBar.css — Glassmorphism Light Cyan Theme */
 
-.reply-bar {
+.reply-bar-container {
   display: flex;
   align-items: center;
-  gap: 12px;
-  background: rgba(139,92,246,0.06);
-  border-top: 1px solid rgba(139,92,246,0.14);
-  padding: 8px 18px;
-  animation: slideUp .18s cubic-bezier(0.34,1.56,0.64,1);
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
-}
-@keyframes slideUp {
-  from { opacity: 0; transform: translateY(8px); }
-  to   { opacity: 1; transform: none; }
-}
-
-.rb-indicator {
-  width: 3px;
-  min-height: 36px;
-  background: linear-gradient(to bottom, #8b5cf6, #6d28d9);
-  border-radius: 3px;
+  justify-content: space-between;
+  padding: 10px 18px;
+  background: rgba(255,255,255,0.7);
+  border-top: 1px solid rgba(255,255,255,0.8);
+  border-left: 3px solid #06b6d4;
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
   flex-shrink: 0;
-  box-shadow: 0 0 8px rgba(139,92,246,0.5);
+  position: relative;
+  z-index: 10;
+  box-shadow: 0 -4px 16px rgba(0,0,0,0.02);
 }
 
-.rb-content {
+.reply-bar-content {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
   flex: 1;
   overflow: hidden;
 }
-.rb-username {
-  display: block;
-  font-size: 11px;
-  font-weight: 700;
-  color: #a78bfa;
-  margin-bottom: 2px;
-  letter-spacing: 0.02em;
-  font-family: 'Inter', sans-serif;
+
+.reply-bar-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
 }
-.rb-text {
-  display: block;
+.reply-bar-icon {
+  font-size: 13px;
+  color: #06b6d4;
+}
+.reply-bar-name {
   font-size: 12px;
-  color: rgba(200,180,255,0.45);
+  font-weight: 700;
+  color: #0891b2;
+  font-family: 'Inter', sans-serif;
+  letter-spacing: 0.01em;
+}
+
+.reply-bar-text {
+  font-size: 13px;
+  color: #64748b;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
   font-family: 'Inter', sans-serif;
+  padding-left: 2px;
 }
 
-.rb-cancel {
-  background: none;
+.reply-bar-close {
+  background: rgba(148,163,184,0.1);
   border: none;
-  font-size: 16px;
+  font-size: 18px;
+  color: #94a3b8;
   cursor: pointer;
-  color: rgba(196,181,253,0.3);
-  padding: 5px;
+  padding: 4px;
   border-radius: 50%;
-  flex-shrink: 0;
-  transition: background .15s, color .15s;
   display: flex;
   align-items: center;
   justify-content: center;
+  width: 28px;
+  height: 28px;
+  margin-left: 12px;
+  transition: background .15s, color .15s;
 }
-.rb-cancel:hover {
-  background: rgba(139,92,246,0.12);
-  color: #c4b5fd;
+.reply-bar-close:hover {
+  background: rgba(239,68,68,0.1);
+  color: #ef4444;
+}
+
+/* Slide up animation */
+.reply-bar-container {
+  animation: slideUp .2s cubic-bezier(0.34,1.56,0.64,1);
+}
+@keyframes slideUp {
+  from { transform: translateY(100%); opacity: 0; }
+  to   { transform: translateY(0); opacity: 1; }
 }

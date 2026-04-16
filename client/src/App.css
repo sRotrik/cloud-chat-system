@@ -1,21 +1,18 @@
-/* App.css — CloudChat Glassmorphism Theme */
+/* App.css — CloudChat Light Cyan Glassmorphism Theme */
 
-/* Remove CRA defaults, keep the palette clean */
 .App {
   min-height: 100vh;
-  background: #06040f;
-  color: #f0eaff;
+  background: #f0f9ff;
+  color: #0f172a;
   font-family: 'Inter', sans-serif;
 }
 
-/* ── Selection glow ──────────────────────────────────────── */
 ::selection {
-  background: rgba(139,92,246,0.38);
-  color: #fff;
+  background: rgba(6, 182, 212, 0.3);
+  color: #0f172a;
 }
 
-/* ── Focus ring accessibility ────────────────────────────── */
 :focus-visible {
-  outline: 2px solid rgba(139,92,246,0.65);
+  outline: 2px solid rgba(6, 182, 212, 0.5);
   outline-offset: 2px;
 }
