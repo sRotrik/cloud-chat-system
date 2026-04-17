@@ -223,6 +223,11 @@ function App() {
     socket.on('receive_private', (msg) => {
       setPrivateMessages(prev => {
         if (msg.from === uname) { return [...prev.filter(m => !m.temp), msg]; }
+        // If window focused and we're viewing this conversation, auto-mark as read
+        if (document.hasFocus()) {
+          socket.emit('mark_read', { from: uname, to: msg.from });
+          return [...prev, { ...msg, readBy: [uname] }];
+        }
         return [...prev, msg];
       });
       fetchConversations(uname);
@@ -255,6 +260,13 @@ function App() {
     setPrivateUser(targetUser); setPrivateMessages([]);
     socket.emit('join_private', { from: username, to: targetUser });
     socket.emit('mark_read', { from: username, to: targetUser });
+    setPrivateMessages(prev => prev.map(m =>
+      m.from === targetUser ? { ...m, read: true } : m
+    ));
+    // Optimistically mark all received messages as read
+    setPrivateMessages(prev => prev.map(m =>
+      m.from === targetUser ? { ...m, readBy: [username] } : m
+    ));
     setSearchQuery(''); setSearchResults([]);
     setScreen('private');
     setTimeout(() => fetchConversations(username), 500);
@@ -269,7 +281,7 @@ function App() {
         replyTo: replyTo ? {
           messageId: replyTo._id,
           username: replyTo.username,
-          text: replyTo.text?.slice(0, 80),
+          text: (replyTo.text || replyTo.message)?.slice(0, 80),
           type: replyTo.type
         } : null
       });
@@ -778,6 +790,7 @@ function App() {
               openPrivateChat={openPrivateChat} isOnline={isOnline}
               onDelete={(id, forEveryone) => handleDeleteMessage(id, forEveryone, false)}
               onForward={handleForwardMessage} onReact={handleReact}
+              onReply={setReplyTo}
               username={username}
             />
           );
@@ -1154,9 +1167,11 @@ const s = {
     transition: 'background 0.2s',
   },
   msgMeta: {
-    fontSize: '10px', color: 'rgba(255, 255, 255, 0.8)',
+    fontSize: '10px',
     marginTop: '5px', display: 'flex', alignItems: 'center', gap: '4px',
   },
+  msgMetaMine: { color: 'rgba(255, 255, 255, 0.85)' },
+  msgMetaTheirs: { color: 'rgba(15, 23, 42, 0.45)' },
   expiryTag: { color: 'rgba(239,68,68,0.8)' },
   typingBar: {
     display: 'flex', alignItems: 'center', gap: '8px',
@@ -1246,7 +1261,7 @@ const s = {
   fileLink: { color: '#0891b2', textDecoration: 'none', fontWeight: '700', fontSize: '13px' },
 };
 
-  const InteractiveRawMessage = ({ m, mine, s, isPrivate, renderMedia, openPrivateChat, isOnline, onDelete, onForward, onReact, username }) => {
+  const InteractiveRawMessage = ({ m, mine, s, isPrivate, renderMedia, openPrivateChat, isOnline, onDelete, onForward, onReact, onReply, username }) => {
     const [showMenu, setShowMenu] = useState(false);
     const holdTimer = useRef(null);
 
@@ -1272,10 +1287,17 @@ const s = {
           <div style={{...(mine ? s.bubbleMine : s.bubbleTheirs), opacity: m.temp ? 0.6 : 1}}>
             {m.type === 'voice' ? <VoicePlayer msg={m} isOwn={mine} /> : (m.fileUrl ? renderMedia(m) : (m.message || m.text))}
           </div>
-          <div style={s.msgMeta}>
+          <div style={{...s.msgMeta, ...(mine ? s.msgMetaMine : s.msgMetaTheirs)}}>
             {m.temp ? '⏳ Sending…' : new Date(m.timestamp || m.createdAt).toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'})}
             {isPrivate && m.expiresAt && !m.temp && (
               <span style={s.expiryTag}>· 🔥 {new Date(m.expiresAt).toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'})}</span>
+            )}
+            {mine && isPrivate && (
+              m.readBy && m.readBy.length > 0
+                ? <span title="Read" style={{color:'#22d3ee', fontWeight:700, fontSize:'12px', letterSpacing:'-1px'}}>✓✓</span>
+                : m.deliveredTo && m.deliveredTo.length > 0
+                  ? <span title="Delivered" style={{color:'rgba(255,255,255,0.7)', fontWeight:700, fontSize:'12px', letterSpacing:'-1px'}}>✓✓</span>
+                  : <span title="Sent" style={{color:'rgba(255,255,255,0.6)', fontWeight:700, fontSize:'12px', letterSpacing:'-1px'}}>✓</span>
             )}
           </div>
           
@@ -1300,6 +1322,7 @@ const s = {
                 </div>
               )}
               <div className="menu-actions" style={{display: 'flex', flexDirection: 'column', gap: '4px'}}>
+                {!isPrivate && <button style={{background: 'none', border: 'none', color: '#fff', textAlign: 'left', cursor: 'pointer', fontSize: '13px'}} onClick={() => { if(onReply) onReply(m); setShowMenu(false); }}>↩ Reply</button>}
                 <button style={{background: 'none', border: 'none', color: '#fff', textAlign: 'left', cursor: 'pointer', fontSize: '13px'}} onClick={() => { if(onForward) onForward(m); setShowMenu(false); }}>➡ Forward</button>
                 <button style={{background: 'none', border: 'none', color: '#fff', textAlign: 'left', cursor: 'pointer', fontSize: '13px'}} onClick={() => { navigator.clipboard.writeText(m.message || m.text || ''); setShowMenu(false); }}>📋 Copy</button>
                 {mine && <button style={{background: 'none', border: 'none', color: '#ff8a8a', textAlign: 'left', cursor: 'pointer', fontSize: '13px'}} onClick={() => { if(onDelete) onDelete(m._id || m.timestamp, true); setShowMenu(false); }}>🗑 Delete for everyone</button>}

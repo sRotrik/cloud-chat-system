@@ -73,7 +73,8 @@ fileId: String,
 mimetype: String,
 originalName: String,
 timestamp: { type: Date, default: Date.now },
-expiresAt: { type: Date, default: () => new Date(Date.now() + 5 * 60 * 1000) }
+expiresAt: { type: Date, default: () => new Date(Date.now() + 5 * 60 * 1000) },
+reactions: { type: Map, default: {} }
 });
 ChatMessageSchema.index({ expiresAt: 1 }, { expireAfterSeconds: 0 });
 const Message = mongoose.model('ChatMessage', ChatMessageSchema);

@@ -63,7 +63,14 @@ function registerHandlers(socket, io) {
   // ── React to message ──
   socket.on('reactToMessage', async ({ messageId, emoji, username, room }) => {
     try {
-      const msg = await Message.findById(messageId);
+      let msg = await Message.findById(messageId);
+      let isOld = false;
+      if (!msg) {
+        const mongoose = require('mongoose');
+        const ChatMessage = mongoose.model('ChatMessage');
+        msg = await ChatMessage.findById(messageId);
+        if (msg) isOld = true;
+      }
       if (!msg) return socket.emit('error', { message: 'Message not found' });
 
       let reaction = msg.reactions.get(emoji) || { emoji, users: [], count: 0 };
@@ -80,7 +87,12 @@ function registerHandlers(socket, io) {
       if (reaction.count === 0) {
         msg.reactions.delete(emoji);
       } else {
+        if (isOld) {
+        if (!msg.reactions) msg.reactions = new Map();
         msg.reactions.set(emoji, reaction);
+      } else {
+        msg.reactions.set(emoji, reaction);
+      }
       }
 
       msg.markModified('reactions');
