@@ -74,9 +74,11 @@ export default function MessageBubble({ msg, currentUser, onReact, onReply, onDe
   return (
     <div
       className={`bubble-wrapper ${isOwn ? 'own' : 'other'}`}
+      style={{ transform: `translateX(${swipeOffset}px)`, transition: swipeOffset ? 'none' : 'transform 0.2s', touchAction: 'pan-y' }}
       onMouseDown={handleMouseDown}
       onMouseUp={handleMouseUp}
       onTouchStart={handleMouseDown}
+      onTouchMove={handleTouchMove}
       onTouchEnd={handleMouseUp}
       onContextMenu={(e) => { e.preventDefault(); setShowContextMenu(true); }}
     >

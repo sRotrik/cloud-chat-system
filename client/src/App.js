@@ -1298,7 +1298,7 @@ const s = {
     };
 
     return (
-      <div style={{...(mine ? s.msgRowMine : s.msgRowTheirs), position: 'relative', transform: \	ranslateX(\px)\, transition: swipeOffset ? 'none' : 'transform 0.2s', touchAction: 'pan-y'}}
+      <div style={{...(mine ? s.msgRowMine : s.msgRowTheirs), position: 'relative', transform: `translateX(${swipeOffset}px)`, transition: swipeOffset ? 'none' : 'transform 0.2s', touchAction: 'pan-y'}}
         onMouseDown={handleDown} onMouseUp={handleUp} 
         onTouchStart={handleDown} onTouchMove={handleTouchMove} onTouchEnd={handleUp}
         onContextMenu={(e) => { e.preventDefault(); setShowMenu(true); }}>
