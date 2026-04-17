@@ -160,7 +160,7 @@ socket.on('join_private', async ({ from, to }) => {
 
 socket.on('send_private', async (data) => {
   const { from, to, message, fileUrl, fileId, mimetype, originalName,
-          type, voiceUrl, voiceDuration, waveform } = data;
+          type, voiceUrl, voiceDuration, waveform, replyTo } = data;
   const roomId = getRoomId(from, to);
   const key = getSharedKey(from, to);
 
@@ -182,7 +182,7 @@ socket.on('send_private', async (data) => {
     voiceDuration: voiceDuration || 0,
     waveform: waveform || [],
     fileUrl, fileId, mimetype, originalName,
-    expiresAt
+    expiresAt, replyTo
   });
   await msg.save();
 

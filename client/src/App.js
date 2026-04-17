@@ -353,12 +353,19 @@ function App() {
   const sendPrivateMessage = () => {
     if (privateMessage.trim() && socketRef.current) {
       const msgText = privateMessage;
+      const rTo = replyTo ? {
+          messageId: replyTo._id,
+          username: replyTo.username || replyTo.from,
+          text: (replyTo.text || replyTo.message)?.slice(0, 80),
+          type: replyTo.type
+        } : null;
       setPrivateMessages(prev => [...prev, {
-        from: username, to: privateUser, message: msgText,
+        from: username, to: privateUser, message: msgText, replyTo: rTo,
         timestamp: new Date(), expiresAt: new Date(Date.now() + 5 * 60 * 1000), temp: true,
       }]);
       setPrivateMessage('');
-      socketRef.current.emit('send_private', { from: username, to: privateUser, message: msgText });
+      setReplyTo(null);
+      socketRef.current.emit('send_private', { from: username, to: privateUser, message: msgText, replyTo: rTo });
       setTimeout(() => fetchConversations(username), 1000);
     }
   };
@@ -687,6 +694,7 @@ function App() {
               isPrivate={true} renderMedia={renderMedia} 
               onDelete={(id, forEveryone) => handleDeleteMessage(id, forEveryone, true, privateUser)} 
               onForward={handleForwardMessage}
+              onReply={setReplyTo}
               username={username}
             />
           );
@@ -699,6 +707,7 @@ function App() {
           <span>{privateUser} is typing</span>
         </div>
       )}
+      <ReplyBar replyTo={replyTo} onCancel={() => setReplyTo(null)} />
       <div style={s.inputBar}>
         <input type="file" ref={privateFileInputRef} onChange={e => handleFileUpload(e, true)}
           accept="image/*,video/*,audio/*" style={{ display: 'none' }} />
@@ -1265,12 +1274,33 @@ const s = {
     const [showMenu, setShowMenu] = useState(false);
     const holdTimer = useRef(null);
 
-    const handleDown = () => { holdTimer.current = setTimeout(() => setShowMenu(true), 500); };
-    const handleUp = () => clearTimeout(holdTimer.current);
+    const [swipeOffset, setSwipeOffset] = useState(0);
+    const touchStartRef = useRef(null);
+
+    const handleDown = (e) => { 
+      holdTimer.current = setTimeout(() => setShowMenu(true), 500);
+      if (e.touches) touchStartRef.current = e.touches[0].clientX;
+    };
+    const handleUp = () => { 
+      clearTimeout(holdTimer.current);
+      if (swipeOffset > 80 && onReply) onReply(m);
+      setSwipeOffset(0);
+      touchStartRef.current = null;
+    };
+
+    const handleTouchMove = (e) => {
+       if (touchStartRef.current !== null) {
+          const deltaX = e.touches[0].clientX - touchStartRef.current;
+          if (deltaX > 0 && deltaX < 120) {
+             setSwipeOffset(deltaX);
+          }
+       }
+    };
 
     return (
-      <div style={{...(mine ? s.msgRowMine : s.msgRowTheirs), position: 'relative'}}
-        onMouseDown={handleDown} onMouseUp={handleUp} onTouchStart={handleDown} onTouchEnd={handleUp}
+      <div style={{...(mine ? s.msgRowMine : s.msgRowTheirs), position: 'relative', transform: \	ranslateX(\px)\, transition: swipeOffset ? 'none' : 'transform 0.2s', touchAction: 'pan-y'}}
+        onMouseDown={handleDown} onMouseUp={handleUp} 
+        onTouchStart={handleDown} onTouchMove={handleTouchMove} onTouchEnd={handleUp}
         onContextMenu={(e) => { e.preventDefault(); setShowMenu(true); }}>
         
         {!mine && isPrivate && <Avatar name={m.from} size={28} />}
@@ -1284,6 +1314,12 @@ const s = {
 
         <div style={{...s.msgBubbleWrap, position: 'relative'}}>
           {!mine && !isPrivate && <div onClick={() => openPrivateChat && openPrivateChat(m.username)} style={{fontSize:'12px',color:'#ccc',cursor:'pointer',marginBottom:'2px'}}>{m.username}</div>}
+          {m.replyTo && (
+            <div style={{ padding: '6px', margin: '0 0 6px 0', borderLeft: '3px solid #000', background: 'rgba(0,0,0,0.05)', borderRadius: '4px', fontSize: '12px' }}>
+               <strong style={{ color: '#000' }}>{m.replyTo.username || m.replyTo.from}</strong>
+               <div style={{ color: '#333' }}>{m.replyTo.type === 'voice' ? '🎤 Voice message' : m.replyTo.text || m.replyTo.message}</div>
+            </div>
+          )}
           <div style={{...(mine ? s.bubbleMine : s.bubbleTheirs), opacity: m.temp ? 0.6 : 1}}>
             {m.type === 'voice' ? <VoicePlayer msg={m} isOwn={mine} /> : (m.fileUrl ? renderMedia(m) : (m.message || m.text))}
           </div>
@@ -1322,7 +1358,7 @@ const s = {
                 </div>
               )}
               <div className="menu-actions" style={{display: 'flex', flexDirection: 'column', gap: '4px'}}>
-                {!isPrivate && <button style={{background: 'none', border: 'none', color: '#fff', textAlign: 'left', cursor: 'pointer', fontSize: '13px'}} onClick={() => { if(onReply) onReply(m); setShowMenu(false); }}>↩ Reply</button>}
+                <button style={{background: 'none', border: 'none', color: '#fff', textAlign: 'left', cursor: 'pointer', fontSize: '13px'}} onClick={() => { if(onReply) onReply(m); setShowMenu(false); }}>↩ Reply</button>
                 <button style={{background: 'none', border: 'none', color: '#fff', textAlign: 'left', cursor: 'pointer', fontSize: '13px'}} onClick={() => { if(onForward) onForward(m); setShowMenu(false); }}>➡ Forward</button>
                 <button style={{background: 'none', border: 'none', color: '#fff', textAlign: 'left', cursor: 'pointer', fontSize: '13px'}} onClick={() => { navigator.clipboard.writeText(m.message || m.text || ''); setShowMenu(false); }}>📋 Copy</button>
                 {mine && <button style={{background: 'none', border: 'none', color: '#ff8a8a', textAlign: 'left', cursor: 'pointer', fontSize: '13px'}} onClick={() => { if(onDelete) onDelete(m._id || m.timestamp, true); setShowMenu(false); }}>🗑 Delete for everyone</button>}

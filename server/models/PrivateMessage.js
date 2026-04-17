@@ -14,6 +14,7 @@ const PrivateMessageSchema = new mongoose.Schema({
   originalName: { type: String },
   timestamp: { type: Date, default: Date.now },
   expiresAt: { type: Date, required: true },
+  replyTo: { type: Object, default: null },
 });
 
 PrivateMessageSchema.index({ expiresAt: 1 }, { expireAfterSeconds: 0 });

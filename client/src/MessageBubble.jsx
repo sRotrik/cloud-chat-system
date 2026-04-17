@@ -11,15 +11,32 @@ const EMOJI_LIST = ['👍', '❤️', '😂', '😮', '😢', '🔥'];
 
 export default function MessageBubble({ msg, currentUser, onReact, onReply, onDelete, onForward }) {
   const [showContextMenu, setShowContextMenu] = useState(false);
+  const [swipeOffset, setSwipeOffset] = useState(0);
   const holdTimer = useRef(null);
+  const touchStartRef = useRef(null);
+
+  const handleTouchMove = (e) => {
+    if (touchStartRef.current !== null) {
+      const deltaX = e.touches[0].clientX - touchStartRef.current;
+      if (deltaX > 0 && deltaX < 120) {
+        setSwipeOffset(deltaX);
+      }
+    }
+  };
 
   const isOwn = msg.username === currentUser || msg.from === currentUser;
 
   // ── Long-press / right-click to show context menu ─────────
-  const handleMouseDown = () => {
+  const handleMouseDown = (e) => {
     holdTimer.current = setTimeout(() => setShowContextMenu(true), 500);
+    if (e && e.touches) touchStartRef.current = e.touches[0].clientX;
   };
-  const handleMouseUp = () => clearTimeout(holdTimer.current);
+  const handleMouseUp = () => {
+    clearTimeout(holdTimer.current);
+    if (swipeOffset > 80 && onReply) onReply(msg);
+    setSwipeOffset(0);
+    touchStartRef.current = null;
+  };
 
   const handleReact = (emoji) => {
     if (onReact) onReact({ messageId: msg._id, emoji });
